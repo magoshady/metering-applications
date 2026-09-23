@@ -113,7 +113,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const i = $('Guard').first().json;\nconst l = $input.first().json;\nconst s = i.settings;\nconst h = i.job.accountHolder;\nconst expires = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(l.expiresAt));\nconst to = s.dryRun ? s.testInbox : h.email;\nconst subject = (s.dryRun ? '[DRY RUN → ' + h.email + '] ' : '') + 'Please sign your AGL solar meter consent – ' + i.job.site.fullAddress;\nconst body = 'Hi ' + h.firstName + ',\\n\\n'\n  + 'To get your meter set up for your new solar at ' + i.job.site.fullAddress + ', AGL needs your consent for us to lodge the request on your behalf.\\n\\n'\n  + 'It takes about a minute. Please check your details and sign here:\\n' + l.url + '\\n\\n'\n  + 'The link is just for you and works until ' + expires + '.\\n\\n'\n  + 'If you have any questions, call us on 1300 797 630.\\n\\n'\n  + 'Kind regards,\\nImpressive Team\\nIMPRESSIVE ELECTRICAL & SOLAR PTY LTD | 1300 797 630';\nreturn [{ json: { ...i, invite: { to, subject, body, expiresAt: l.expiresAt } } }];"
+        "jsCode": "const i = $('Guard').first().json;\nconst l = $input.first().json;\nconst s = i.settings;\nconst h = i.job.accountHolder;\nconst expires = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(l.expiresAt));\nconst to = s.dryRun ? s.testInbox : h.email;\nconst subject = (s.dryRun ? '[DRY RUN → ' + h.email + '] ' : '') + 'Please sign your AGL solar meter consent – ' + i.job.site.fullAddress;\nconst esc = (x) => String(x).replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));\nconst p = (x) => '<p style=\"margin:0 0 14px\">' + x + '</p>';\nconst body = '<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1b2230;max-width:560px\">'\n  + (s.dryRun ? '<p style=\"margin:0 0 14px;padding:8px 10px;background:#fff4d6;border-radius:6px;font-size:13px\">DRY RUN: in live mode this goes to ' + esc(h.email) + '.</p>' : '')\n  + p('Hi ' + esc(h.firstName) + ',')\n  + p('To get your meter set up for your new solar at <strong>' + esc(i.job.site.fullAddress) + '</strong>, AGL needs your consent for us to lodge the request on your behalf.')\n  + p('It takes about a minute: check your details and sign.')\n  + '<p style=\"margin:22px 0\"><a href=\"' + esc(l.url) + '\" style=\"background:#0b5cad;color:#ffffff;text-decoration:none;font-weight:bold;padding:13px 26px;border-radius:8px;display:inline-block\">Review and sign</a></p>'\n  + p('<span style=\"color:#5d6675;font-size:13px\">This link is just for you and works until ' + esc(expires) + '.</span>')\n  + p('If you have any questions, call us on 1300 797 630.')\n  + p('Kind regards,<br>Impressive Team<br><span style=\"color:#5d6675\">IMPRESSIVE ELECTRICAL &amp; SOLAR PTY LTD | 1300 797 630</span>')\n  + '</div>';\nreturn [{ json: { ...i, invite: { to, subject, body, expiresAt: l.expiresAt } } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -128,7 +128,7 @@
       "parameters": {
         "sendTo": "={{ $json.invite.to }}",
         "subject": "={{ $json.invite.subject }}",
-        "emailType": "text",
+        "emailType": "html",
         "message": "={{ $json.invite.body }}",
         "options": {
           "appendAttribution": false,

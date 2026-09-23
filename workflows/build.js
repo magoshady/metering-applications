@@ -167,15 +167,21 @@ const h = i.job.accountHolder;
 const expires = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(l.expiresAt));
 const to = s.dryRun ? s.testInbox : h.email;
 const subject = (s.dryRun ? '[DRY RUN → ' + h.email + '] ' : '') + 'Please sign your AGL solar meter consent – ' + i.job.site.fullAddress;
-const body = 'Hi ' + h.firstName + ',\\n\\n'
-  + 'To get your meter set up for your new solar at ' + i.job.site.fullAddress + ', AGL needs your consent for us to lodge the request on your behalf.\\n\\n'
-  + 'It takes about a minute. Please check your details and sign here:\\n' + l.url + '\\n\\n'
-  + 'The link is just for you and works until ' + expires + '.\\n\\n'
-  + 'If you have any questions, call us on 1300 797 630.\\n\\n'
-  + 'Kind regards,\\nImpressive Team\\nIMPRESSIVE ELECTRICAL & SOLAR PTY LTD | 1300 797 630';
+const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const p = (x) => '<p style="margin:0 0 14px">' + x + '</p>';
+const body = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1b2230;max-width:560px">'
+  + (s.dryRun ? '<p style="margin:0 0 14px;padding:8px 10px;background:#fff4d6;border-radius:6px;font-size:13px">DRY RUN: in live mode this goes to ' + esc(h.email) + '.</p>' : '')
+  + p('Hi ' + esc(h.firstName) + ',')
+  + p('To get your meter set up for your new solar at <strong>' + esc(i.job.site.fullAddress) + '</strong>, AGL needs your consent for us to lodge the request on your behalf.')
+  + p('It takes about a minute: check your details and sign.')
+  + '<p style="margin:22px 0"><a href="' + esc(l.url) + '" style="background:#0b5cad;color:#ffffff;text-decoration:none;font-weight:bold;padding:13px 26px;border-radius:8px;display:inline-block">Review and sign</a></p>'
+  + p('<span style="color:#5d6675;font-size:13px">This link is just for you and works until ' + esc(expires) + '.</span>')
+  + p('If you have any questions, call us on 1300 797 630.')
+  + p('Kind regards,<br>Impressive Team<br><span style="color:#5d6675">IMPRESSIVE ELECTRICAL &amp; SOLAR PTY LTD | 1300 797 630</span>')
+  + '</div>';
 return [{ json: { ...i, invite: { to, subject, body, expiresAt: l.expiresAt } } }];`), { position: [1200, -240] });
   const invSend = w.node('Email Homeowner', 'n8n-nodes-base.gmail', 2.1, {
-    sendTo: '={{ $json.invite.to }}', subject: '={{ $json.invite.subject }}', emailType: 'text', message: '={{ $json.invite.body }}',
+    sendTo: '={{ $json.invite.to }}', subject: '={{ $json.invite.subject }}', emailType: 'html', message: '={{ $json.invite.body }}',
     options: { appendAttribution: false, senderName: 'Impressive Team' },
   }, { credentials: CRED.gmail, position: [1440, -240] });
   const invUpd = w.node('Awaiting Signature Updates', 'n8n-nodes-base.code', 2, code(`${LOG_FN}
