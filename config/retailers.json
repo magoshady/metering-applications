@@ -93,7 +93,8 @@
     "portalUrl": "https://www.originenergy.com.au/ocportal",
     "handler": "manual",
     "phone": null,
-    "enabled": true
+    "enabled": true,
+    "notes": "Portal. Manual task for now; automate next session (with Powershop)."
   },
   "red_energy": {
     "label": "Red Energy",
@@ -115,11 +116,12 @@
   },
   "powershop": {
     "label": "Powershop",
-    "route": "phone_manual",
+    "route": "portal_manual",
+    "portalUrl": "https://www.powershop.com.au/smart-meter-request",
     "handler": "manual",
     "phone": null,
     "enabled": true,
-    "notes": "[CONFIRM phone]"
+    "notes": "Web form. Manual task for now; automate together with Origin (next session)."
   },
   "engie": {
     "label": "ENGIE",

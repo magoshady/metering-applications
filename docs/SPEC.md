@@ -379,6 +379,7 @@ One sender workflow for every `email_auto` retailer; `config/retailers.json` say
 - **GloBird**: network letter only. To `cs@globirdenergy.com.au`.
 - **Amber**: CCEW + network letter (approved for NSW). To `info@amber.com.au`.
 - **Red Energy**: CCEW + network letter to `solarenquiries@redenergy.com.au` (confirmed working). Body: solar installed at ADDRESS, NMI, files attached.
+- **Origin** (portal) and **Powershop** (web form `https://www.powershop.com.au/smart-meter-request`): manual task for now; **next session: automate both.**
 - **1st Energy**: no email or process known → manual task (`MTR – 20`) until one is found.
 
 ### 6.7 `MTR – 20 Manual Task Handler` (Phase 3)
