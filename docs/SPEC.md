@@ -286,7 +286,7 @@ For each PDF:
 | `MTR – 41 Reply Watcher` | Gmail trigger on the sending mailbox, label `Metering/Replies` | Detect retailer acknowledgements, capture reference |
 | `MTR – 05 Network Letter Intake` | Gmail trigger, same label as PTC Approval DER (read-only, parallel) | Extract NMI/job no., attach letter to deal |
 | `MTR – 42 Completion Hook` | Own Gmail trigger on the Intellihub "ORDER COMPLETED" emails (parallel to existing parser, which is untouched) | Extract NMI, mark completed |
-| `MTR – 99 Error Handler` | n8n Error Trigger | Gmail alert to Rodrigo with execution link |
+| `MTR – 99 Error Handler` (n8n `CS7g4VWEMmGhn3DQ`, built) | n8n Error Trigger | Gmail from Rod's Impressive Batteries' Email to rodrigo@impressivebatteries.com.au: workflow, deal link (from a `deal <id>:` error prefix), node, error, execution link |
 
 Set `MTR – 99` as the **error workflow** on every MTR workflow.
 
