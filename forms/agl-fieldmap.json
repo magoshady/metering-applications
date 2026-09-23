@@ -1,0 +1,61 @@
+{
+  "_source": "AGL 'Application for Electricity' AGL1629 (Updated June 2021), supplied by Rodrigo. Not fillable: values are drawn at the box positions below (PDF points, origin bottom-left, page index 0-based). Boxes measured from the PDF's own vector rectangles.",
+  "_expressions": "value = path into the AGL job object (see buildAglJob), or a literal prefixed with '='. Checkboxes: ticked when the value is truthy.",
+  "text": [
+    { "label": "1. Other: short description of works", "page": 0, "x": 219, "y": 355, "w": 157, "h": 20, "value": "otherWorks" },
+    { "label": "2. Lot no", "page": 0, "x": 60, "y": 289, "w": 18, "h": 19, "value": "site.lot" },
+    { "label": "2. Unit no", "page": 0, "x": 113, "y": 290, "w": 18, "h": 19, "value": "site.unit" },
+    { "label": "2. Street no", "page": 0, "x": 173, "y": 289, "w": 18, "h": 19, "value": "site.streetNumber" },
+    { "label": "2. Street name", "page": 0, "x": 245, "y": 289, "w": 122, "h": 19, "value": "site.streetLine" },
+    { "label": "2. Suburb", "page": 0, "x": 401, "y": 289, "w": 81, "h": 19, "value": "site.suburb" },
+    { "label": "2. Postcode", "page": 0, "x": 521, "y": 289, "w": 40, "h": 19, "value": "site.postcode" },
+    { "label": "2. Meter or NMI no", "page": 0, "x": 434, "y": 265, "w": 127, "h": 19, "value": "nmi" },
+    { "label": "2. PV SEG number (solar installations only)", "page": 0, "x": 305, "y": 75, "w": 256, "h": 20, "value": "pvSegLine" },
+
+    { "label": "3a. Account holder full name", "page": 1, "x": 128, "y": 758, "w": 311, "h": 20, "value": "accountHolder.fullName" },
+    { "label": "3a. Account holder telephone/mobile", "page": 1, "x": 99, "y": 656, "w": 94, "h": 20, "value": "accountHolder.mobile" },
+    { "label": "3a. Account holder email", "page": 1, "x": 341, "y": 656, "w": 223, "h": 20, "value": "accountHolder.email", "keepCase": true },
+
+    { "label": "3b. Authorised contact full name", "page": 1, "x": 128, "y": 577, "w": 309, "h": 20, "value": "applicant.fullName" },
+    { "label": "3b. Business name", "page": 1, "x": 128, "y": 551, "w": 201, "h": 20, "value": "contractor.business" },
+    { "label": "3b. ABN", "page": 1, "x": 389, "y": 551, "w": 174, "h": 20, "value": "contractor.abn" },
+    { "label": "3b. Telephone/mobile", "page": 1, "x": 99, "y": 475, "w": 94, "h": 20, "value": "applicant.mobile" },
+    { "label": "3b. Email", "page": 1, "x": 341, "y": 475, "w": 223, "h": 20, "value": "contractor.email", "keepCase": true },
+
+    { "label": "4. REC contact name", "page": 1, "x": 86, "y": 402, "w": 140, "h": 20, "value": "contractor.contactName" },
+    { "label": "4. REC business name", "page": 1, "x": 327, "y": 402, "w": 236, "h": 20, "value": "contractor.business" },
+    { "label": "4. REC ABN", "page": 1, "x": 101, "y": 378, "w": 125, "h": 20, "value": "contractor.abn" },
+    { "label": "4. Electricity licence number", "page": 1, "x": 327, "y": 378, "w": 236, "h": 20, "value": "contractor.recLicence" },
+    { "label": "4. REC telephone/mobile", "page": 1, "x": 101, "y": 328, "w": 125, "h": 20, "value": "contractor.phone" },
+    { "label": "4. REC email", "page": 1, "x": 259, "y": 328, "w": 304, "h": 20, "value": "contractor.email", "keepCase": true },
+
+    { "label": "6. Date (day)", "page": 2, "x": 373, "y": 34, "w": 20, "h": 23, "value": "today.day" },
+    { "label": "6. Date (month)", "page": 2, "x": 398, "y": 34, "w": 18, "h": 23, "value": "today.month" },
+    { "label": "6. Date (year)", "page": 2, "x": 419, "y": 34, "w": 25, "h": 23, "value": "today.year" }
+  ],
+  "checkbox": [
+    { "label": "1. Addition/Alteration", "page": 0, "x": 219, "y": 560, "size": 14, "value": "=true" },
+    { "label": "1. Install controlled load", "page": 0, "x": 222, "y": 513, "size": 9, "value": "addControlledLoad" },
+    { "label": "1. Solar installation", "page": 0, "x": 222, "y": 425, "size": 9, "value": "=true" },
+    { "label": "1. Other", "page": 0, "x": 222, "y": 408, "size": 9, "value": "removeControlledLoad" },
+    { "label": "2. Type of property: Residential", "page": 0, "x": 113, "y": 238, "size": 14, "value": "=true" },
+    { "label": "2. Single dwelling", "page": 0, "x": 427, "y": 238, "size": 14, "value": "=true" },
+    { "label": "2. I understand full and unlimited site access must be available", "page": 0, "x": 33, "y": 197, "size": 14, "value": "=true" },
+    { "label": "2. Life support: N", "page": 0, "x": 392, "y": 148, "size": 14, "value": "=true" },
+    { "label": "4. Electrician present at site: N", "page": 1, "x": 327, "y": 298, "size": 14, "value": "=true" },
+    { "label": "6. Addition/Alteration only acceptance", "page": 2, "x": 33, "y": 675, "size": 11, "value": "=true" },
+    { "label": "6. Model standing offer (NSW & SA)", "page": 2, "x": 33, "y": 537, "size": 11, "value": "=true" }
+  ],
+  "leaveBlank": [
+    "1. Installation, Removal and their sub-options; Move meter; phase upgrade/downgrade; Additional meter",
+    "2. Deposited Plan Number; Business; Multiple; access issues text; Life support Y; EWR (QLD); REX (SA)",
+    "3a. Title, DOB, business, ABN, licence/Medicare, postal address (same as supply), fax, AGL account number",
+    "3b. Title, DOB, licence/Medicare, postal address, fax",
+    "4. Postal address, preferred meter provider",
+    "5. Meter and Supply Details (new installations only)",
+    "7. Third party payment"
+  ],
+  "signature": { "page": 2, "x": 33, "y": 34, "w": 282, "h": 23, "_how": "Rodrigo Candi signs as the authorised contact person (3b): contractors.json impressive.signatory.signatureSvgPath" },
+  "otherWorksTemplate": "Remove controlled load",
+  "pvSegTemplate": "{{distributor}} network approval {{networkApproval.reference}}"
+}

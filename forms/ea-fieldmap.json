@@ -1,0 +1,186 @@
+{
+  "_source": "EnergyAustralia 'Service Works request for electricity' (service_works_request_form_2024.pdf), fillable AcroForm, 3 pages A4. Field names are generic (Text35, Check Box3…), mapped here by position against the printed labels.",
+  "_expressions": "Values are paths into the job object (§6.2 of SPEC.md) or literals prefixed with '='. Checkboxes: true = ticked.",
+  "text": {
+    "Text35": {
+      "label": "2. Description of works (line 1)",
+      "value": "(descriptionTemplate, wrapped)"
+    },
+    "Text36": {
+      "label": "2. Description of works (line 2)",
+      "value": "(descriptionTemplate, wrapped)"
+    },
+    "Text37": {
+      "label": "2. Description of works (line 3)",
+      "value": "(descriptionTemplate, wrapped)"
+    },
+    "Text38": {
+      "label": "3. Lot no",
+      "value": "site.lot"
+    },
+    "Text39": {
+      "label": "3. Unit no",
+      "value": "site.unit"
+    },
+    "Text40": {
+      "label": "3. Street no",
+      "value": "site.streetNumber"
+    },
+    "Text41": {
+      "label": "3. Street name",
+      "value": "site.streetName"
+    },
+    "Text42": {
+      "label": "3. Street type",
+      "value": "site.streetType"
+    },
+    "Text43": {
+      "label": "3. Suburb",
+      "value": "site.suburb"
+    },
+    "Text44": {
+      "label": "3. State",
+      "value": "site.state"
+    },
+    "Text45": {
+      "label": "3. Postcode",
+      "value": "site.postcode"
+    },
+    "Text47": {
+      "label": "3. NMI or meter number (alterations and solar)",
+      "value": "nmi"
+    },
+    "Text56": {
+      "label": "5. Solar system install date",
+      "value": "install.dateDisplay"
+    },
+    "Text57": {
+      "label": "6. Electrician full name",
+      "value": "contractor.contactName"
+    },
+    "Text58": {
+      "label": "6. Electrician mobile",
+      "value": "contractor.mobile"
+    },
+    "Text59": {
+      "label": "6. Business name",
+      "value": "contractor.business"
+    },
+    "Text60": {
+      "label": "6. Landline",
+      "value": "contractor.phone"
+    },
+    "Text61": {
+      "label": "6. Electrical licence no",
+      "value": "contractor.recLicence"
+    },
+    "Text62": {
+      "label": "6. Email",
+      "value": "contractor.email"
+    },
+    "Text53": {
+      "label": "5. Off peak: if yes, please specify",
+      "value": "offPeakSpecify"
+    },
+    "Text71": {
+      "label": "8. Applicant first name",
+      "value": "applicant.firstName"
+    },
+    "Text72": {
+      "label": "8. Applicant last name",
+      "value": "applicant.lastName"
+    },
+    "Text73": {
+      "label": "8. Applicant mobile",
+      "value": "applicant.mobile"
+    },
+    "Text74": {
+      "label": "8. Applicant landline",
+      "value": "contractor.phone"
+    },
+    "Text75": {
+      "label": "8. Applicant email",
+      "value": "contractor.email"
+    },
+    "Text76": {
+      "label": "8. Applicant business name",
+      "value": "contractor.business"
+    },
+    "Text77": {
+      "label": "8. Applicant ABN",
+      "value": "contractor.abn"
+    },
+    "Text78": {
+      "label": "9. Date (signed by Impressive)",
+      "value": "todayDisplay"
+    }
+  },
+  "checkbox": {
+    "Check Box3": {
+      "label": "1. Solar alteration (add solar channel into meter)",
+      "value": "=true"
+    },
+    "Check Box23": {
+      "label": "5. Premise type: Residential",
+      "value": "=true"
+    },
+    "Check Box28": {
+      "label": "5. Upgrading/downgrading phases? No",
+      "value": "=true"
+    },
+    "Check Box29": {
+      "label": "5. Solar system: New",
+      "value": "=true"
+    },
+    "Check Box25": {
+      "label": "5. Adding or removing off peak? Yes",
+      "value": "offPeakChange"
+    },
+    "Check Box26": {
+      "label": "5. Adding or removing off peak? No",
+      "value": "offPeakNoChange"
+    }
+  },
+  "leaveBlank": {
+    "Check Box1-2": "1. New connection / Alteration",
+    "Text46, Text48, Text49": "3. NMI (Ausgrid new connections), DP number, REX ID (SAPN)",
+    "Check Box4-20, Text50-51": "4. Connection details (new connections only)",
+    "Check Box21-22, Text52": "4. cont. conjunction works (new connections only)",
+    "Check Box30-31": "5. Solar system Replacement / Upgrade",
+    "Check Box32-34, Text63-69": "7. Level 2 electrician details: leave blank (decided)",
+    "Check Box24, Check Box27, Text55": "5. Commercial / phases yes and its specify box",
+    "Text70": "8. Applicant title"
+  },
+  "descriptionTemplate": "Account holder {{accountHolder.fullName}}. New {{kw}} kW solar PV installed {{install.dateDisplay}}. CCEW {{ccew.receipt}}. {{distributor}} network approval {{networkApproval.reference}}.",
+  "_description": "The account holder's name appears nowhere else on the form (Impressive is the applicant), so it leads the description. src/fillEaForm.js word-wraps it over the 3 boxes at the largest font (9 down to 6 pt) that fits, and fails if it can't.",
+  "offPeak": {
+    "_property": "dedicated_controlled_load",
+    "Yes - Add": {
+      "offPeakChange": true,
+      "offPeakNoChange": false,
+      "offPeakSpecify": "ADD DEDICATED CONTROLLED LOAD"
+    },
+    "Yes - Remove": {
+      "offPeakChange": true,
+      "offPeakNoChange": false,
+      "offPeakSpecify": "REMOVE CONTROLLED LOAD"
+    },
+    "No": {
+      "offPeakChange": false,
+      "offPeakNoChange": true,
+      "offPeakSpecify": ""
+    },
+    "(blank)": "hold: task 'Confirm dedicated controlled load (hot water) Add / Remove / No'"
+  },
+  "signature": {
+    "_how": "Impressive is the applicant; Rodrigo Candi signs. Draw config/contractors.json impressive.signatory.signatureSvgPath (an 'RC' scribble, vector, no image file) inside the Signature79 rectangle with pdf-lib drawSvgPath, and set Text78 to today's date.",
+    "field": "Signature79",
+    "page": 2,
+    "rect_pt": {
+      "x": 39,
+      "y": 112,
+      "w": 215,
+      "h": 31
+    }
+  }
+}

@@ -2,51 +2,75 @@
   "energyaustralia": {
     "label": "EnergyAustralia",
     "route": "email_auto",
-    "to": ["solarconnections@energyaustralia.com.au"],
+    "to": [
+      "solarconnections@energyaustralia.com.au"
+    ],
     "cc": [],
     "subjectTemplate": "Solar meter alteration – NMI {{nmi}} – {{street}}, {{suburb}}",
     "handler": "ea",
-    "needsCustomerSignature": true,
-    "attachments": ["ea_form", "ccew", "network_letter", "landlord_letter_if_tenant"],
+    "needsCustomerSignature": false,
+    "attachments": [
+      "ea_form",
+      "ccew",
+      "network_letter"
+    ],
     "phone": "1800 818 378",
-    "enabled": true
+    "enabled": true,
+    "form": "ea"
   },
   "agl": {
     "label": "AGL",
     "route": "email_auto",
-    "to": ["aglnewconns@agl.com.au"],
+    "to": [
+      "aglnewconns@agl.com.au"
+    ],
     "cc": [],
-    "subjectTemplate": "Solar meter {{workType}} – NMI {{nmi}} – {{street}}, {{suburb}}",
+    "subjectTemplate": "Solar meter alteration – NMI {{nmi}} – {{street}}, {{suburb}}",
     "handler": "agl",
     "needsCustomerSignature": true,
-    "attachments": ["agl_form", "agl_consent_form", "network_letter"],
+    "attachments": [
+      "agl_form",
+      "agl_consent_signed",
+      "ccew",
+      "network_letter"
+    ],
     "phone": "1800 680 430",
-    "enabled": false
+    "enabled": true,
+    "form": "agl",
+    "consentForm": "agl-consent"
   },
   "globird": {
     "label": "GloBird",
     "route": "email_auto",
-    "to": ["cs@globirdenergy.com.au"],
+    "to": [
+      "cs@globirdenergy.com.au"
+    ],
     "cc": [],
     "subjectTemplate": "Solar meter configuration – NMI {{nmi}} – {{street}}, {{suburb}}",
     "handler": "globird",
     "needsCustomerSignature": false,
-    "attachments": ["network_letter"],
+    "attachments": [
+      "network_letter"
+    ],
     "phone": null,
-    "enabled": false
+    "enabled": true
   },
   "amber": {
     "label": "Amber",
     "route": "email_auto",
-    "to": ["info@amber.com.au"],
+    "to": [
+      "info@amber.com.au"
+    ],
     "cc": [],
     "subjectTemplate": "Solar meter request – NMI {{nmi}} – {{street}}, {{suburb}}",
     "handler": "amber",
     "needsCustomerSignature": false,
-    "attachments": ["ccew", "network_letter"],
+    "attachments": [
+      "ccew",
+      "network_letter"
+    ],
     "phone": null,
-    "enabled": false,
-    "notes": "[CONFIRM] NSW document list; Amber's help article names VIC CES/EWR."
+    "enabled": true
   },
   "first_energy": {
     "label": "1st Energy",
@@ -54,12 +78,14 @@
     "to": [],
     "cc": [],
     "subjectTemplate": "Solar meter request – NMI {{nmi}} – {{street}}, {{suburb}}",
-    "handler": "first_energy",
+    "handler": "manual",
     "needsCustomerSignature": false,
-    "attachments": ["ccew"],
+    "attachments": [
+      "ccew"
+    ],
     "phone": null,
-    "enabled": false,
-    "notes": "[CONFIRM inbox] Switch route to email_auto once the inbox is confirmed. Energy Locals links stop 1 Dec 2026."
+    "enabled": true,
+    "notes": "No email or process found (Rodrigo, 23 Sep 2026): manual task until one is known."
   },
   "origin": {
     "label": "Origin",
@@ -67,27 +93,116 @@
     "portalUrl": "https://www.originenergy.com.au/ocportal",
     "handler": "manual",
     "phone": null,
-    "enabled": true
+    "enabled": true,
+    "notes": "Portal. Manual task for now; automate next session (with Powershop)."
   },
   "red_energy": {
     "label": "Red Energy",
+    "route": "email_auto",
+    "to": [
+      "solarenquiries@redenergy.com.au"
+    ],
+    "cc": [],
+    "subjectTemplate": "Solar installed – NMI {{nmi}} – {{street}}, {{suburb}}",
+    "handler": "email",
+    "needsCustomerSignature": false,
+    "attachments": [
+      "ccew",
+      "network_letter"
+    ],
+    "bodyTemplate": "red_energy",
+    "phone": "131 806",
+    "enabled": true
+  },
+  "powershop": {
+    "label": "Powershop",
+    "route": "portal_manual",
+    "portalUrl": "https://www.powershop.com.au/smart-meter-request",
+    "handler": "manual",
+    "phone": null,
+    "enabled": true,
+    "notes": "Web form. Manual task for now; automate together with Origin (next session)."
+  },
+  "engie": {
+    "label": "ENGIE",
     "route": "phone_manual",
     "handler": "manual",
-    "phone": "131 806",
-    "enabled": true,
-    "notes": "[CONFIRM] whether solarenquiries@redenergy.com.au is live."
+    "phone": "13 88 08",
+    "enabled": true
   },
-  "powershop": { "label": "Powershop", "route": "phone_manual", "handler": "manual", "phone": null, "enabled": true, "notes": "[CONFIRM phone]" },
-  "engie": { "label": "ENGIE", "route": "phone_manual", "handler": "manual", "phone": "13 88 08", "enabled": true },
-  "alinta": { "label": "Alinta Energy", "route": "phone_manual", "handler": "manual", "phone": "1300 669 950", "enabled": true },
-  "momentum": { "label": "Momentum Energy", "route": "phone_manual", "handler": "manual", "phone": "1300 662 778", "enabled": true },
-  "discover": { "label": "Discover Energy", "route": "phone_manual", "handler": "manual", "phone": null, "enabled": true },
-  "nectr": { "label": "Nectr", "route": "phone_manual", "handler": "manual", "phone": null, "enabled": true },
-  "ampol": { "label": "Ampol Energy", "route": "phone_manual", "handler": "manual", "phone": null, "enabled": true },
-  "blue_nrg": { "label": "Blue NRG", "route": "phone_manual", "handler": "manual", "phone": null, "enabled": true },
-  "diamond": { "label": "Diamond Energy", "route": "phone_manual", "handler": "manual", "phone": null, "enabled": true },
-  "kogan": { "label": "Kogan Energy", "route": "phone_manual", "handler": "manual", "phone": null, "enabled": true },
-  "ovo": { "label": "OVO Energy", "route": "phone_manual", "handler": "manual", "phone": null, "enabled": true },
-  "invalid": { "label": "Invalid retailer", "route": "unknown", "handler": "hold", "enabled": true },
-  "blank": { "label": "No retailer", "route": "unknown", "handler": "hold", "enabled": true }
+  "alinta": {
+    "label": "Alinta Energy",
+    "route": "phone_manual",
+    "handler": "manual",
+    "phone": "1300 669 950",
+    "enabled": true
+  },
+  "momentum": {
+    "label": "Momentum Energy",
+    "route": "phone_manual",
+    "handler": "manual",
+    "phone": "1300 662 778",
+    "enabled": true
+  },
+  "discover": {
+    "label": "Discover Energy",
+    "route": "phone_manual",
+    "handler": "manual",
+    "phone": null,
+    "enabled": true
+  },
+  "nectr": {
+    "label": "Nectr",
+    "route": "phone_manual",
+    "handler": "manual",
+    "phone": null,
+    "enabled": true
+  },
+  "ampol": {
+    "label": "Ampol Energy",
+    "route": "phone_manual",
+    "handler": "manual",
+    "phone": null,
+    "enabled": true
+  },
+  "blue_nrg": {
+    "label": "Blue NRG",
+    "route": "phone_manual",
+    "handler": "manual",
+    "phone": null,
+    "enabled": true
+  },
+  "diamond": {
+    "label": "Diamond Energy",
+    "route": "phone_manual",
+    "handler": "manual",
+    "phone": null,
+    "enabled": true
+  },
+  "kogan": {
+    "label": "Kogan Energy",
+    "route": "phone_manual",
+    "handler": "manual",
+    "phone": null,
+    "enabled": true
+  },
+  "ovo": {
+    "label": "OVO Energy",
+    "route": "phone_manual",
+    "handler": "manual",
+    "phone": null,
+    "enabled": true
+  },
+  "invalid": {
+    "label": "Invalid retailer",
+    "route": "unknown",
+    "handler": "hold",
+    "enabled": true
+  },
+  "blank": {
+    "label": "No retailer",
+    "route": "unknown",
+    "handler": "hold",
+    "enabled": true
+  }
 }

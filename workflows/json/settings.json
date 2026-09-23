@@ -1,0 +1,106 @@
+{
+  "name": "MTR – 00 Settings",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e0b8bb46-ef63-459d-a2da-dd3387da2d97",
+      "name": "When Called"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── EDIT HERE ──────────────────────────────────────────────\nconst settings = {\n  // true: every retailer email and DocuSeal request goes to testInbox, HubSpot\n  // tasks are emailed to testInbox instead, and the only HubSpot write is a\n  // \"[DRY RUN]\" line in Metering Automation Log.\n  dryRun: true,\n  testInbox: 'rodrigo@impressivebatteries.com.au',\n  fillerUrl: 'https://metering-applications.vercel.app',\n  docusealApi: 'https://docuseal.impressivebatteries.com.au/api',\n  alertTo: 'rodrigo@impressivebatteries.com.au',\n  taskOwnerId: '360340383',            // Rodrigo Candi\n  stageAfterSend: '1509971393',        // Install Complete and metering forms submitted…\n  labels: { processed: 'Metering 2.0 - Processed', error: 'Metering 2.0 - Error' },\n};\n// ───────────────────────────────────────────────────────────\nif (settings.dryRun && !settings.testInbox) throw new Error('Set testInbox in MTR – 00 Settings before running in dry run');\nreturn [{ json: settings }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "c618a024-e40d-4f45-a690-c076168b4693",
+      "name": "Settings"
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        0
+      ],
+      "id": "10f401a9-0821-4c37-ade4-37aa57792707",
+      "name": "Gmail Labels",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bBoYFD6eHvB5ixtS",
+          "name": "Rod's Impressive Batteries' Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $('Settings').first().json;\nconst byName = Object.fromEntries($input.all().map((i) => [i.json.name, i.json.id]));\nconst labelIds = {};\nfor (const [k, name] of Object.entries(s.labels)) {\n  if (!byName[name]) throw new Error('Gmail label \"' + name + '\" not found in the mailbox');\n  labelIds[k] = byName[name];\n}\nreturn [{ json: { ...s, labelIds } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "db1a9632-2074-4934-ada1-921c66263bde",
+      "name": "Attach Label IDs"
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Gmail Labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Labels": {
+      "main": [
+        [
+          {
+            "node": "Attach Label IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "CS7g4VWEMmGhn3DQ",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

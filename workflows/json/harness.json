@@ -1,0 +1,463 @@
+{
+  "name": "MTR – T Test Harness",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mtr-test",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a6da2df3-e8f9-4e8c-a44e-d1506fbe4e18",
+      "name": "Test Webhook",
+      "webhookId": "mtr-test"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\nif ((j.headers || {})['x-mtr-test'] !== \"58bed84fb4c24a45ed5c6fd6018fff5230ebc19425d83e8d\") throw new Error('bad test token');\nconst b = j.body || {};\nreturn [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter: !!b.pretendLetter, asRetailer: b.asRetailer || '', messageId: '' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "a7d05e43-9795-4dc8-a5cf-625ee7471f28",
+      "name": "Check Token"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "job",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "job"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "process",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "process"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "send",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "send"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "7e518856-feba-4a52-a62f-c8e78a975c07",
+      "name": "By Mode"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "6b91NqzIvCJTc1ez",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        -200
+      ],
+      "id": "9a5b7f40-8fca-4acf-a26f-d74b44f64fa3",
+      "name": "Build Job"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nreturn [{ json: { action: r.action, reasons: r.reasons, retailerKey: r.retailerKey, job: r.job, dealUpdates: r.dealUpdates } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -200
+      ],
+      "id": "11947a39-8acc-479e-a8a9-0748b33ee454",
+      "name": "Result"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "rSAHfKBbqnACv8uK",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        0
+      ],
+      "id": "a0742269-3891-4193-a622-809ac496bf73",
+      "name": "Process Deal"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true, items: $input.all().map((i) => i.json) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "da47a661-8245-49f1-ad17-6f102f852618",
+      "name": "Process Result"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "FjT3zT91PYYQGYCc",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        200
+      ],
+      "id": "1645c13f-c5f3-4683-a242-ec0c2d3b9aaa",
+      "name": "Get Settings"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { dealId: $('Check Token').first().json.dealId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ],
+      "id": "f32ebef8-6161-45c8-a6a6-4e8812550e40",
+      "name": "Deal ID"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "6b91NqzIvCJTc1ez",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        200
+      ],
+      "id": "e83bc275-67a8-4e7f-aa79-9e403ec8b12a",
+      "name": "Build Job (send)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst settings = $('Get Settings').first().json;\nif (!settings.dryRun) throw new Error('send test only runs in dry run');\n// Test-only: log line marks it so nobody mistakes it for a real send.\nr.deal.properties.metering_automation_log = (r.deal.properties.metering_automation_log || '') + '';\nif ($('Check Token').first().json.pretendLetter && !r.job.networkApproval.fileId) {\n  r.job.networkApproval.fileId = r.job.ccew.fileId;\n  r.reasons = r.reasons.filter((x) => !/network approval letter/.test(x));\n  if (!r.reasons.length && r.action === 'hold') r.action = 'email';\n}\nconst as = $('Check Token').first().json.asRetailer;\nif (as) {\n  const retailers = {\"energyaustralia\":{\"label\":\"EnergyAustralia\",\"route\":\"email_auto\",\"to\":[\"solarconnections@energyaustralia.com.au\"],\"cc\":[],\"subjectTemplate\":\"Solar meter alteration – NMI {{nmi}} – {{street}}, {{suburb}}\",\"handler\":\"ea\",\"needsCustomerSignature\":false,\"attachments\":[\"ea_form\",\"ccew\",\"network_letter\"],\"phone\":\"1800 818 378\",\"enabled\":true,\"form\":\"ea\"},\"agl\":{\"label\":\"AGL\",\"route\":\"email_auto\",\"to\":[\"aglnewconns@agl.com.au\"],\"cc\":[],\"subjectTemplate\":\"Solar meter alteration – NMI {{nmi}} – {{street}}, {{suburb}}\",\"handler\":\"agl\",\"needsCustomerSignature\":true,\"attachments\":[\"agl_form\",\"agl_consent_signed\",\"ccew\",\"network_letter\"],\"phone\":\"1800 680 430\",\"enabled\":true,\"form\":\"agl\",\"consentForm\":\"agl-consent\"},\"globird\":{\"label\":\"GloBird\",\"route\":\"email_auto\",\"to\":[\"cs@globirdenergy.com.au\"],\"cc\":[],\"subjectTemplate\":\"Solar meter configuration – NMI {{nmi}} – {{street}}, {{suburb}}\",\"handler\":\"globird\",\"needsCustomerSignature\":false,\"attachments\":[\"network_letter\"],\"phone\":null,\"enabled\":true},\"amber\":{\"label\":\"Amber\",\"route\":\"email_auto\",\"to\":[\"info@amber.com.au\"],\"cc\":[],\"subjectTemplate\":\"Solar meter request – NMI {{nmi}} – {{street}}, {{suburb}}\",\"handler\":\"amber\",\"needsCustomerSignature\":false,\"attachments\":[\"ccew\",\"network_letter\"],\"phone\":null,\"enabled\":true},\"first_energy\":{\"label\":\"1st Energy\",\"route\":\"phone_manual\",\"to\":[],\"cc\":[],\"subjectTemplate\":\"Solar meter request – NMI {{nmi}} – {{street}}, {{suburb}}\",\"handler\":\"manual\",\"needsCustomerSignature\":false,\"attachments\":[\"ccew\"],\"phone\":null,\"enabled\":true,\"notes\":\"No email or process found (Rodrigo, 23 Sep 2026): manual task until one is known.\"},\"origin\":{\"label\":\"Origin\",\"route\":\"portal_manual\",\"portalUrl\":\"https://www.originenergy.com.au/ocportal\",\"handler\":\"manual\",\"phone\":null,\"enabled\":true,\"notes\":\"Portal. Manual task for now; automate next session (with Powershop).\"},\"red_energy\":{\"label\":\"Red Energy\",\"route\":\"email_auto\",\"to\":[\"solarenquiries@redenergy.com.au\"],\"cc\":[],\"subjectTemplate\":\"Solar installed – NMI {{nmi}} – {{street}}, {{suburb}}\",\"handler\":\"email\",\"needsCustomerSignature\":false,\"attachments\":[\"ccew\",\"network_letter\"],\"bodyTemplate\":\"red_energy\",\"phone\":\"131 806\",\"enabled\":true},\"powershop\":{\"label\":\"Powershop\",\"route\":\"portal_manual\",\"portalUrl\":\"https://www.powershop.com.au/smart-meter-request\",\"handler\":\"manual\",\"phone\":null,\"enabled\":true,\"notes\":\"Web form. Manual task for now; automate together with Origin (next session).\"},\"engie\":{\"label\":\"ENGIE\",\"route\":\"phone_manual\",\"handler\":\"manual\",\"phone\":\"13 88 08\",\"enabled\":true},\"alinta\":{\"label\":\"Alinta Energy\",\"route\":\"phone_manual\",\"handler\":\"manual\",\"phone\":\"1300 669 950\",\"enabled\":true},\"momentum\":{\"label\":\"Momentum Energy\",\"route\":\"phone_manual\",\"handler\":\"manual\",\"phone\":\"1300 662 778\",\"enabled\":true},\"discover\":{\"label\":\"Discover Energy\",\"route\":\"phone_manual\",\"handler\":\"manual\",\"phone\":null,\"enabled\":true},\"nectr\":{\"label\":\"Nectr\",\"route\":\"phone_manual\",\"handler\":\"manual\",\"phone\":null,\"enabled\":true},\"ampol\":{\"label\":\"Ampol Energy\",\"route\":\"phone_manual\",\"handler\":\"manual\",\"phone\":null,\"enabled\":true},\"blue_nrg\":{\"label\":\"Blue NRG\",\"route\":\"phone_manual\",\"handler\":\"manual\",\"phone\":null,\"enabled\":true},\"diamond\":{\"label\":\"Diamond Energy\",\"route\":\"phone_manual\",\"handler\":\"manual\",\"phone\":null,\"enabled\":true},\"kogan\":{\"label\":\"Kogan Energy\",\"route\":\"phone_manual\",\"handler\":\"manual\",\"phone\":null,\"enabled\":true},\"ovo\":{\"label\":\"OVO Energy\",\"route\":\"phone_manual\",\"handler\":\"manual\",\"phone\":null,\"enabled\":true},\"invalid\":{\"label\":\"Invalid retailer\",\"route\":\"unknown\",\"handler\":\"hold\",\"enabled\":true},\"blank\":{\"label\":\"No retailer\",\"route\":\"unknown\",\"handler\":\"hold\",\"enabled\":true}};\n  if (!retailers[as]) throw new Error('unknown retailer ' + as);\n  r.retailer = retailers[as]; r.retailerKey = as; r.job.retailerKey = as; r.job.retailerLabel = retailers[as].label;\n}\nif (r.action !== 'email') throw new Error('deal ' + r.dealId + ' is not sendable: ' + r.action + ' ' + r.reasons.join('; '));\nreturn [{ json: { ...r, settings } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        200
+      ],
+      "id": "2e986962-7e92-4688-a142-a76d5e157ce8",
+      "name": "Pretend"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "qX1JwgbW9ALdP7cp",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        200
+      ],
+      "id": "915ebb18-b8a1-4307-a8df-ce21a265b880",
+      "name": "Send Application"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true, items: $input.all().map((i) => i.json) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        200
+      ],
+      "id": "948ec773-c1de-405e-aa8e-39846a9bab2f",
+      "name": "Send Result"
+    }
+  ],
+  "connections": {
+    "Test Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Token": {
+      "main": [
+        [
+          {
+            "node": "By Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "By Mode": {
+      "main": [
+        [
+          {
+            "node": "Build Job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Deal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Job": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Deal": {
+      "main": [
+        [
+          {
+            "node": "Process Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Settings": {
+      "main": [
+        [
+          {
+            "node": "Deal ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deal ID": {
+      "main": [
+        [
+          {
+            "node": "Build Job (send)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Job (send)": {
+      "main": [
+        [
+          {
+            "node": "Pretend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pretend": {
+      "main": [
+        [
+          {
+            "node": "Send Application",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Application": {
+      "main": [
+        [
+          {
+            "node": "Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "CS7g4VWEMmGhn3DQ",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

@@ -1,0 +1,279 @@
+{
+  "name": "MTR – 30 DocuSeal Completed",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mtr-docuseal",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "690d13cc-b620-4698-afc2-bde2d5f33f1c",
+      "name": "DocuSeal Webhook",
+      "webhookId": "mtr-docuseal"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || {};\nconst ev = b.event_type || '';\nconst d = b.data || {};\nconst submissionId = d.submission_id || d.submission?.id || (ev.startsWith('submission') ? d.id : null);\nif (!['form.completed', 'submission.completed'].includes(ev) || !submissionId) return [];\nreturn [{ json: { event: ev, submissionId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "881aa1e0-00d0-4612-a64f-5fe71603a89f",
+      "name": "Parse Event"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://docuseal.impressivebatteries.com.au/api/submissions/' + $json.submissionId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "a37dfd03-5098-46ea-a893-a4cc9d482867",
+      "name": "Get Submission",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3jRr6HHI4Wx4x1oP",
+          "name": "Docuseal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $input.first().json;\nconst sub = (s.submitters || [])[0] || {};\nif (s.status !== 'completed' && sub.status !== 'completed') return [];\nconst dealId = sub.external_id;\nif (!dealId) throw new Error('DocuSeal submission ' + s.id + ' has no external_id (deal ID)');\nconst doc = (s.documents || sub.documents || [])[0];\nif (!doc || !doc.url) throw new Error('deal ' + dealId + ': signed DocuSeal document URL missing (submission ' + s.id + ')');\nreturn [{ json: { dealId: String(dealId), signedConsentUrl: doc.url } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "49936b79-3243-4c4c-a9c5-3dc56af6c302",
+      "name": "Check Completed"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "FjT3zT91PYYQGYCc",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        0
+      ],
+      "id": "643c4c1a-6940-4924-acca-629138463667",
+      "name": "Get Settings"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { dealId: $('Check Completed').first().json.dealId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "edbf34f7-0127-4c91-a172-e1151903ee02",
+      "name": "Deal ID"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "6b91NqzIvCJTc1ez",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        0
+      ],
+      "id": "38cb0045-6520-4f01-a384-6fbe275581f0",
+      "name": "Build Job"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst c = $('Check Completed').first().json;\nconst settings = $('Get Settings').first().json;\nconst status = r.deal.properties.metering_status;\nif (!settings.dryRun && status !== 'Awaiting Customer Signature') throw new Error('deal ' + c.dealId + ': consent signed but Metering Status is \"' + status + '\", not Awaiting Customer Signature; not sending');\nreturn [{ json: { ...r, settings, phase: 'send', signedConsentUrl: c.signedConsentUrl } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        0
+      ],
+      "id": "0b9ef980-d9ee-4654-a9f6-8230c9c77bd9",
+      "name": "Prepare Send"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "qX1JwgbW9ALdP7cp",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        0
+      ],
+      "id": "449b33f4-d619-49e8-a11e-cba2acccea50",
+      "name": "Send Application"
+    }
+  ],
+  "connections": {
+    "DocuSeal Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Event": {
+      "main": [
+        [
+          {
+            "node": "Get Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Submission": {
+      "main": [
+        [
+          {
+            "node": "Check Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Completed": {
+      "main": [
+        [
+          {
+            "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Settings": {
+      "main": [
+        [
+          {
+            "node": "Deal ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deal ID": {
+      "main": [
+        [
+          {
+            "node": "Build Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Job": {
+      "main": [
+        [
+          {
+            "node": "Prepare Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Send": {
+      "main": [
+        [
+          {
+            "node": "Send Application",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "CS7g4VWEMmGhn3DQ",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

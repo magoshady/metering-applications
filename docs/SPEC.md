@@ -51,8 +51,8 @@ Then track every application to completion (chase at day 10, escalate at day 20,
 
 ### Existing workflows you must know about (do not break them)
 
-- **PTC Approval DER workflow**: Gmail trigger on labelled emails → downloads attachments → IF on subject → Anthropic "Analyze document" extracts **NMI** and **AEMO DER Register job number** from the PDF whose filename contains `_PTC_`. **This is where network approval letters already arrive.** Phase 0 extends it (see §5.3). Do not rewrite it; add nodes at the end.
-- **Intellihub "ORDER COMPLETED" parser**: parses Airtable-sent Intellihub emails for meter exchange/reconfiguration completion and extracts the NMI from the HTML body. Phase 4 hooks into this to close applications.
+- **PTC Approval DER workflow**: Gmail trigger on labelled emails → downloads attachments → IF on subject → Anthropic "Analyze document" extracts **NMI** and **AEMO DER Register job number** from the PDF whose filename contains `_PTC_`. **This is where network approval letters already arrive.** **Do not modify it.** MTR runs its own parallel workflow on the same emails (see §5.3); the original is switched off later if and when MTR fully replaces it.
+- **Intellihub "ORDER COMPLETED" parser**: parses Airtable-sent Intellihub emails for meter exchange/reconfiguration completion and extracts the NMI from the HTML body. **Do not modify it.** Phase 4 uses a separate MTR workflow watching the same emails (see §6.0); the original is switched off later if needed.
 - **CCEW automation** (`ccew-form-v1.vercel.app`) and **PDF-to-PNG for CCEW uploads**. The CCEW PDF source is here. `[CONFIRM]` where the final CCEW PDF lives (HubSpot file on the deal? Drive? GreenDeal?).
 - OpenSolar → HubSpot webhook at `/webhook/other-component-update`. Irrelevant here, but don't reuse that path.
 
@@ -82,7 +82,7 @@ Pipeline **Post Sale To Completion** = `978394588`.
 | Ignore | `1509971396` | Job Cancelled |
 | Upstream (context) | `2114714048` Job Done – PTC Pending · `1509971392` 95% Complete · `3301252579` Pending Sun Cover – Job Done · `1509971391` Battery Installed | |
 
-> Only move the deal from `1879662022` to `1509971393` **after** the application is actually sent (email route) or the manual task is marked complete (portal/phone route). `[CONFIRM]` Rodrigo may prefer the automation never moves stages and only sets `metering_status`.
+> Only move the deal from `1879662022` to `1509971393` **after** the application is actually sent (email route) or the manual task is marked complete (portal/phone route). (Decided: the automation moves the stage.)
 
 ### 3.2 Existing deal properties to READ
 
@@ -226,7 +226,7 @@ Every retailer has an `enabled` flag. **Only `energyaustralia` is enabled at the
 
 | Retailer | Required | Nice to have |
 |---|---|---|
-| EnergyAustralia | EA "Service Works Request" form (NSW/ACT/SA new connection, alteration or solar upgrade), filled + signed by account holder; landlord permission letter if leased | CCEW, network letter |
+| EnergyAustralia | EA "Service Works Request" form, filled + signed by Impressive as applicant | CCEW, network letter |
 | AGL | AGL Electricity application form (PDF) with: meter phases, REC name/licence/phone/ASP no. (alteration) or panel install date + inverter-on date (exchange); **homeowner meter request consent form** if we lodge on their behalf | network letter (Ausgrid CNL / Endeavour & Essential PTC) |
 | GloBird | The distributor letter only: Ausgrid CNL / Endeavour Connection of Generator / Essential CSO | |
 | Amber | Compliance certificate + network approval `[CONFIRM for NSW; their article names VIC's CES/EWR]` | |
@@ -251,11 +251,19 @@ For each PDF:
 
 ### 5.3 Getting the network letter and CCEW onto the deal
 
-- **Network letter**: extend the existing **PTC Approval DER workflow**. After it extracts the NMI and DER job number:
-  1. Find the deal by `nmi` (HubSpot search, pipeline `978394588`). If 0 or >1 matches → Gmail alert to Rodrigo, stop.
-  2. Upload the PDF to HubSpot Files (folder `metering/network-letters/`, private access), attach it to the deal via a note, write `network_approval_letter_url`.
-  3. Ask the Anthropic node to also extract the **approval reference number** and **distributor** → write `network_approval_reference`; if `electricity_distributor` is blank, fill it.
-  4. Filename patterns: Endeavour contains `_PTC_`. `[CONFIRM]` how Ausgrid CNLs and Essential CSO letters arrive (same inbox/label? filename pattern?). Add IF branches for them.
+- **Network letter** (decided): new workflow `MTR – 05 Network Letter Intake`, running in parallel with the three existing distributor PTC workflows (left untouched). Only these three Gmail labels carry approval letters:
+
+  | Distributor | Gmail label ID | Skip emails whose subject contains | Which PDF |
+  |---|---|---|---|
+  | Endeavour | `Label_5823373004158048354` | `Thank you for your Application Submission` | attachment whose filename contains `_PTC_` (case-insensitive) |
+  | Ausgrid | `Label_3303489167417198909` | `Thank you for your Application Submission` | first attachment (`attachment_0`) |
+  | Essential | `Label_592177598515650554` | `Essential Energy Connection Application Approved` (as the existing workflow does) | first attachment (`attachment_0`) |
+
+  Gmail triggers poll every minute, download attachments, and never change labels or read state. **No backfill**: new emails only.
+  1. Claude (Anthropic node) reads the chosen PDF → `{ nmi, reference, distributor, isApprovalLetter }`. If `isApprovalLetter` is false → stop quietly.
+  2. Find the deal: search pipeline `978394588` by the first 10 characters of the NMI (the 11th is a checksum). 0 or >1 matches → alert to Rodrigo, stop.
+  3. Upload the PDF to HubSpot Files (`metering/network-letters/`, private), attach it to the deal via a note, write `network_approval_letter_url` and `network_approval_reference`; fill `electricity_distributor` if blank.
+  4. If the deal is on hold only for a missing network letter, re-run `MTR – 01` for that deal.
 - **CCEW PDF**: `[CONFIRM]` source. Options: (a) the ccew-form app writes it to HubSpot → read `ccew_pdf_url`; (b) it's in Google Drive → search by NMI; (c) from GreenDeal. Do not build this until confirmed.
 
 ---
@@ -266,8 +274,8 @@ For each PDF:
 
 | Workflow | Trigger | Job |
 |---|---|---|
-| `MTR – 01 Trigger & Router` | Schedule every 15 min (poll) **or** HubSpot webhook on `dealstage` change | Find deals entering `1879662022`, validate, normalise, route |
-| `MTR – 10 EA Handler` | Execute Workflow (sub) | Fill EA form → DocuSeal → on signed, email EA |
+| `MTR – 01 Trigger & Router` | Gmail trigger (Rod's Impressive Batteries' Email), label `Metering 2.0` | Deal ID from subject → fetch deal, validate, normalise, route |
+| `MTR – 10 EA Handler` | Execute Workflow (sub) | Fill EA form, Impressive signs as applicant, email EA (no DocuSeal) |
 | `MTR – 11 AGL Handler` | sub | Fill AGL PDF (+ consent) → DocuSeal → email |
 | `MTR – 12 GloBird Handler` | sub | Email network letter |
 | `MTR – 13 Amber Handler` | sub | Email docs |
@@ -276,26 +284,23 @@ For each PDF:
 | `MTR – 30 DocuSeal Completed` | Webhook from DocuSeal | Download signed PDF → call the retailer's send step |
 | `MTR – 40 Chaser` | Schedule daily 8am AEST | Day-10 chase email, day-20 escalation task |
 | `MTR – 41 Reply Watcher` | Gmail trigger on the sending mailbox, label `Metering/Replies` | Detect retailer acknowledgements, capture reference |
-| `MTR – 42 Completion Hook` | Called from existing Intellihub parser | Mark completed |
-| `MTR – 99 Error Handler` | n8n Error Trigger | Gmail alert to Rodrigo with execution link |
+| `MTR – 05 Network Letter Intake` | Gmail trigger, same label as PTC Approval DER (read-only, parallel) | Extract NMI/job no., attach letter to deal |
+| `MTR – 42 Completion Hook` | Own Gmail trigger on the Intellihub "ORDER COMPLETED" emails (parallel to existing parser, which is untouched) | Extract NMI, mark completed |
+| `MTR – 99 Error Handler` (n8n `CS7g4VWEMmGhn3DQ`, built) | n8n Error Trigger | Gmail from Rod's Impressive Batteries' Email to rodrigo@impressivebatteries.com.au: workflow, deal link (from a `deal <id>:` error prefix), node, error, execution link |
 
 Set `MTR – 99` as the **error workflow** on every MTR workflow.
 
 ### 6.1 `MTR – 01 Trigger & Router`
 
-**Trigger choice.** Prefer **polling** (simple, robust): every 15 min, HubSpot search:
+***Trigger (decided).** A HubSpot workflow emails Rodrigo when a deal meets the criteria (deal stage, job status, NMI present, etc.). A Gmail filter applies the label `Metering 2.0`. `MTR – 01` uses a **Gmail Trigger** on n8n credential *Rod's Impressive Batteries' Email*, filtered to that label, polling every minute.
 
-```
-filterGroups: [{ filters: [
-  { propertyName: "pipeline", operator: "EQ", value: "978394588" },
-  { propertyName: "dealstage", operator: "EQ", value: "1879662022" },
-  { propertyName: "metering_status", operator: "NOT_HAS_PROPERTY" }
-]}]
-```
+1. **Deal ID** = the digits in the email subject (ignore `Fwd:`/other text). No number → label `Metering 2.0 - Error`, alert, stop.
+2. The email is only a signal: **all data comes from the HubSpot deal** fetched by ID.
+3. **Duplicate guard**: if `metering_status` already has a value → label `Metering 2.0 - Processed`, stop (no auto-retry; a human clears the status to retry).
+4. Re-check NMI and retailer even though the HubSpot criteria cover them (fields can change after the email).
+5. On finish, add label `Metering 2.0 - Processed` (success) or `Metering 2.0 - Error` (failure). The trigger itself never removes labels.
 
-(Use a second filter group for `metering_status` = `Metering Issues Not Sent On Hold` only if we want auto-retry after fixes; default **no auto-retry**; a human clears the status to retry.)
-
-Properties to fetch: every READ property in §3.2 plus the new ones.
+roperties to fetch: every READ property in §3.2 plus the new ones.
 
 **Steps:**
 1. **Fetch associations**: primary contact (account holder), and existing notes/files if needed.
@@ -311,7 +316,7 @@ Properties to fetch: every READ property in §3.2 plus the new ones.
    - Contact has first name, last name, email, mobile
    - Site address complete
    - `installer` set (to pick REC details)
-5. On validation failure → `metering_status = Metering Issues Not Sent On Hold`, append log, create **task** on the deal owned by `[CONFIRM: admin owner id]` titled `Metering blocked – <reasons>`, stop.
+5. On validation failure → `metering_status = Metering Issues Not Sent On Hold`, append log, create **task** on the deal owned by Rodrigo Candi (owner `360340383`) titled `Metering blocked – <reasons>`, stop.
 6. **Lock**: write `metering_status = Awaiting Manual Lodgement` or a temporary lock value `[CONFIRM new option]` before calling the handler, so a second poll can't double-send. (If no new option is approved, write `metering_automation_log` line `LOCK <executionId>` and check for it.)
 7. **Route**: look up `Retailer Config`; if `enabled=false` → Manual Task Handler; else Execute the handler sub-workflow with a single normalised **Job object** (§6.2).
 
@@ -338,48 +343,44 @@ Properties to fetch: every READ property in §3.2 plus the new ones.
 }
 ```
 
-**Contractor block** comes from a config keyed by `installer`:
-
-```json
-{
-  "Impressive,":  { "business": "[CONFIRM]", "abn": "[CONFIRM]", "recLicence": "[CONFIRM]", "aspNumber": "[CONFIRM]", "contactName": "[CONFIRM]", "phone": "1300 797 630", "email": "[CONFIRM]" },
-  "Energy Flow":  { "business": "[CONFIRM]", "abn": "[CONFIRM]", "recLicence": "[CONFIRM]", "aspNumber": "[CONFIRM]", "contactName": "[CONFIRM]", "phone": "[CONFIRM]", "email": "[CONFIRM]" }
-}
-```
+**Contractor block** (decided): always Impressive, from `config/contractors.json` (`impressive`). Business name, ABN, ACN, email and phone are filled; electrician name, mobile and licence number are `[CONFIRM]`.
 
 ### 6.3 `MTR – 10 EA Handler` (Phase 1: build this first, fully)
 
-1. Fetch EA form template from `./forms/ea.pdf` (baked into the filler service image).
-2. Fill: service type = **Solar alteration**; description of works = `New solar PV system {{kW}} kW installed {{install.date}}; inverter on {{completionDate}}. Please add solar channel / reconfigure or exchange meter as required. CCEW {{ccew.receipt}}. Network approval {{networkApproval.reference}} ({{distributor}}).`; site; NMI; electrician block from contractor; account holder block. `[CONFIRM]` kW source property (look for a system size property, e.g. `sf_system_size`; if not found, omit).
-3. If `ownership != Owner-occupier` → require a landlord letter: create task "Get landlord permission letter", stop with `Awaiting Customer Signature` / hold.
-4. Send to DocuSeal (§7) for the account holder's signature. Set status `Awaiting Customer Signature` `[CONFIRM option]`.
-5. On DocuSeal completion (`MTR – 30`): email EA:
+Form: `forms/ea.pdf` (EA "Service Works request for electricity", 2024 edition, supplied by Rodrigo). It is a **fillable AcroForm** with generic field names; `forms/ea-fieldmap.json` maps each one to its printed label and to a job-object path. `forms/ea-sample-filled.pdf` is a sample fill with dummy data.
+
+**Impressive is the applicant and signs** (decided). No DocuSeal for EA: the form is filled, signed with the signatory's signature image and today's date, and sent straight away.
+
+Data sources (decided):
+- **Applicant (section 8)** = Impressive: signatory name/mobile `[CONFIRM]`, business name, ABN, email, landline from `config/contractors.json`.
+- **Electrician (section 6)** = nominated supervisor **Sam Husband**, licence **279684C**, Impressive business details. Section 7 (Level 2) left blank.
+- **Account holder** = the deal's primary contact. Their name goes at the start of the description of works (it is not asked for anywhere else on the form) and in the email body.
+- **System size** = `sf_system_size_kw_stc`.
+- **Off peak** = `dedicated_controlled_load`: `Yes - Add` → Yes + "ADD DEDICATED CONTROLLED LOAD"; `Yes - Remove` → Yes + "REMOVE CONTROLLED LOAD"; `No` → No; blank → hold + task.
+- **CCEW PDF** = file on a HubSpot note on the deal whose attachment name starts with `CCEW ` (e.g. `CCEW 1234567`); receipt number from `ccew_receipt_number`. Missing, or numbers differ → hold + alert.
+- **Replies** from EA can go to any address; the form uses `ccew@impressivebatteries.com.au`.
+
+Steps:
+1. Fill via the **Vercel function** `POST /api/ea-form` (this repo, `api/ea-form.js`; header `x-api-key` = `FILLER_API_KEY`; body = job object; returns `application/pdf`, or 400 `{ error }` → hold + alert). It wraps `src/fillEaForm.js` and `forms/ea-fieldmap.json`. The output is flattened. Ticks: Solar alteration; Residential; off peak per above; phase change No; Solar system New.
+2. No landlord check: Impressive only ever deals with the homeowner (decided; `property_ownership` not created).
+3. Stamp the signature image into `Signature79` and today's date into `Text78`. Upload the signed form to HubSpot Files (`metering/signed-forms/`) and note it on the deal.
+4. Email EA from Rod's Impressive Batteries' Email:
    - To: `solarconnections@energyaustralia.com.au`
    - Subject: `Solar meter alteration – NMI {{nmi}} – {{street}}, {{suburb}}`
-   - Body: §8.1
+   - Body: §8.1, signed **Impressive Team**
    - Attach: signed EA form, CCEW PDF, network letter.
-6. After send: `metering_status = Metering Application Sent`, `metering_application_date = today`, append log with Gmail message ID + thread ID, move stage to `1509971393` `[CONFIRM]`, create ticket "Metering application lodged – EnergyAustralia" associated to deal.
+5. After send: `metering_status = Metering Application Sent`, `metering_application_date = today`, log Gmail message + thread ID, create ticket "Metering application lodged – EnergyAustralia", and **move the deal to stage `1509971393`** ("Install Complete and metering forms submitted for first time PV installations…").
 
-### 6.4 `MTR – 11 AGL Handler` (Phase 2)
+### 6.4 AGL, GloBird, Amber (decided): all go through `MTR – 10 Send Application`
 
-- Primary AGL channel is their online new connections platform; we use the **PDF + email fallback** that AGL publishes.
-- Decide **alteration vs exchange**: `existing_smart_meter = No` → exchange; else alteration `[CONFIRM mapping]`.
-  - Alteration fields: number of meter phases, REC name, licence no., contact number, FSP/ASP number.
-  - Exchange fields: panel install date (`installation_date`), inverter switch-on date (`installation_completion_date`).
-- Because we lodge on the homeowner's behalf, the **meter request consent form** must be signed by the homeowner → DocuSeal packet with **both** documents.
-- Supply address and meter details must match the latest AGL invoice. `[CONFIRM]` whether we have the bill on file (HubSpot file? `average_electricity_bill` suggests bills are collected at sale).
-- To: `aglnewconns@agl.com.au`. Subject: `Solar meter {{alteration|exchange}} – NMI {{nmi}} – {{address}}`.
+One sender workflow for every `email_auto` retailer; `config/retailers.json` says who to email and what to attach. Adding a retailer is a config line.
 
-### 6.5 `MTR – 12 GloBird Handler` (Phase 2)
-
-- No signature needed. Attach the distributor letter only.
-- Validate the letter type matches the distributor (CNL for Ausgrid, Connection of Generator for Endeavour, CSO for Essential). The PTC extension should store a `letterType` in the log; if unknown → hold.
-- To: `cs@globirdenergy.com.au`. Subject: `Solar meter configuration – NMI {{nmi}} – {{address}}`.
-- GloBird replies with timeframe/charges/consent needed → Reply Watcher flags it for a human.
-
-### 6.6 `MTR – 13 Amber`, `MTR – 14 1st Energy` (Phase 2)
-
-Simple email handlers: CCEW + network letter + install date in body. **Disabled until the `[CONFIRM]` items in §4.2 are resolved.**
+- **AGL**: form `forms/agl.pdf` (AGL1629, June 2021). Not fillable: `forms/agl-fieldmap.json` holds box coordinates; filled by the Vercel function `POST /api/agl-form`. Addition/Alteration → Solar installation; Install controlled load if `dedicated_controlled_load = Yes - Add`, Other "Remove controlled load" if `Yes - Remove`. Section 3a = homeowner (name, mobile, email); **3b authorised contact = Rodrigo Candi / Impressive, who signs the application**. AGL also needs the homeowner's **consent form** (`forms/agl-consent.pdf`, AGL1295): filled by `POST /api/agl-consent` (organiser = Rodrigo / Impressive), signed by the homeowner in **DocuSeal** (areas in `forms/agl-consent-fieldmap.json`); `MTR – 30` sends the AGL email once it's signed. Section 4 = Sam Husband 279684C. Network approval goes in the PV SEG line. Attach AGL form + signed consent + CCEW + network letter. To `aglnewconns@agl.com.au`.
+- **GloBird**: network letter only. To `cs@globirdenergy.com.au`.
+- **Amber**: CCEW + network letter (approved for NSW). To `info@amber.com.au`.
+- **Red Energy**: CCEW + network letter to `solarenquiries@redenergy.com.au` (confirmed working). Body: solar installed at ADDRESS, NMI, files attached.
+- **Origin** (portal) and **Powershop** (web form `https://www.powershop.com.au/smart-meter-request`): manual task for now; **next session: automate both.**
+- **1st Energy**: no email or process known → manual task (`MTR – 20`) until one is found.
 
 ### 6.7 `MTR – 20 Manual Task Handler` (Phase 3)
 
@@ -389,8 +390,8 @@ For Origin, phone routes and anything disabled/unknown:
 2. Create a HubSpot **task** on the deal:
    - Title: `Lodge metering – {{Retailer}} ({{route}}) – NMI {{nmi}}`
    - Body: retailer phone/portal link, the data sheet, links to CCEW and network letter, and the three questions to ask phone-route retailers the first time (which inbox, which documents per distributor, can an installer lodge with signed customer authority).
-   - Owner: `[CONFIRM admin owner id]`; due: +1 business day.
-3. `metering_status = Awaiting Manual Lodgement` `[CONFIRM option]`.
+   - Owner: Rodrigo Candi (owner `360340383`); due: +1 business day.
+3. `metering_status = Awaiting Manual Lodgement`.
 4. Poll tasks (in `MTR – 40`): when the task is completed → set `Metering Application Sent`, date, stage move.
 
 ### 6.8 `MTR – 30 DocuSeal Completed`
@@ -433,6 +434,8 @@ Daily 08:00 Australia/Sydney. Deals with `metering_status = Metering Application
 
 ## 8. Email templates
 
+All bodies live in `config/email-templates.json` (one per retailer, signed Impressive Team). The EA example below is the original draft.
+
 Plain, professional, Arial-style plain text (brand guide: emails in Arial/Calibri; tone approachable, professional, plain-spoken). Sign-off from the sending mailbox owner `[CONFIRM name/title]`.
 
 ### 8.1 Application email (EA example)
@@ -452,14 +455,14 @@ Solar installed: {{install.date}} (inverter switched on {{install.completionDate
 CCEW: {{ccew.receipt}}
 
 Attached:
-- Signed Service Works Request
+- Service Works Request (signed by Impressive as applicant)
 - CCEW
 - {{distributor}} network approval letter
 
 The system is switched off pending meter work. Please let us know if you need anything else.
 
 Kind regards,
-{{sender.name}}
+Impressive Team
 {{contractor.business}} | {{contractor.phone}}
 ```
 
@@ -502,7 +505,7 @@ Thanks,
 
 ## 11. Acceptance criteria (Phase 1 done when…)
 
-- [ ] A deal entering `1879662022` with EA as retailer and all data valid results in: DocuSeal request to the customer → after signing, one email to EA with 3 attachments → status, date, log, ticket and stage all updated. No human touch.
+- [ ] A deal entering `1879662022` with EA as retailer and all data valid results in: EA form filled and signed by Impressive → one email to EA with 3 attachments → status, date, log, ticket and stage all updated. No human touch.
 - [ ] Invalid data results in a hold status + a task listing every problem.
 - [ ] Running the poll twice never double-sends.
 - [ ] Dry run mode sends nothing externally.

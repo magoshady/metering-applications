@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/ea-form.js": {
+      "includeFiles": "{forms/ea.pdf,forms/ea-fieldmap.json,config/contractors.json}"
+    },
+    "api/agl-form.js": {
+      "includeFiles": "{forms/agl.pdf,forms/agl-fieldmap.json,config/contractors.json}"
+    },
+    "api/agl-consent.js": {
+      "includeFiles": "{forms/agl-consent.pdf,forms/agl-fieldmap.json,forms/agl-consent-fieldmap.json,config/contractors.json}"
+    }
+  }
+}
