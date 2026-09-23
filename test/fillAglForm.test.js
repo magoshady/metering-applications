@@ -54,17 +54,14 @@ test('text too long for its box fails loudly', async () => {
   );
 });
 
-test('consent form: every box on the page, DocuSeal areas are fractions of the page', async () => {
-  const { fillAglConsent } = require('../src/fillAglForm');
-  const { docusealArea } = require('../src/overlayForm');
+test('consent form: filled, then signed with a drawn signature and an audit line', async () => {
+  const { fillAglConsent, signAglConsent } = require('../src/fillAglForm');
   const consentMap = require('../forms/agl-consent-fieldmap.json');
   const tpl = fs.readFileSync(path.join(__dirname, '../forms/agl-consent.pdf'));
-  const doc = await PDFDocument.load(tpl);
-  for (const f of [...consentMap.text, ...consentMap.checkbox]) assert.ok(doc.getPages()[f.page], f.label);
-  const bytes = await fillAglConsent(tpl, consentMap, buildAglJob(job, fieldmap, impressive, today));
-  assert.strictEqual((await PDFDocument.load(bytes)).getPageCount(), 2);
-  for (const box of Object.values(consentMap.docuseal)) {
-    const a = docusealArea(box);
-    for (const k of ['x', 'y', 'w', 'h']) assert.ok(a[k] >= 0 && a[k] <= 1, `${k}=${a[k]}`);
-  }
+  const j = buildAglJob(job, fieldmap, impressive, today);
+  assert.strictEqual((await PDFDocument.load(await fillAglConsent(tpl, consentMap, j))).getPageCount(), 2);
+  // 1x1 transparent PNG stands in for the drawn signature.
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  const signed = await signAglConsent(tpl, consentMap, j, png, { name: 'Jane Citizen', email: 'jane@example.com', signedAt: '2026-09-24T00:14:00Z', ip: '1.2.3.4', dealId: '1' });
+  assert.strictEqual((await PDFDocument.load(signed)).getPageCount(), 2);
 });

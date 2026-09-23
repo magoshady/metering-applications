@@ -35,13 +35,12 @@ W.settings = workflow('MTR – 00 Settings', (w) => {
   const t = w.node('When Called', 'n8n-nodes-base.executeWorkflowTrigger', 1.1, { inputSource: 'passthrough' });
   const s = w.node('Settings', 'n8n-nodes-base.code', 2, code(`// ── EDIT HERE ──────────────────────────────────────────────
 const settings = {
-  // true: every retailer email and DocuSeal request goes to testInbox, HubSpot
+  // true: every retailer email and homeowner signing link goes to testInbox, HubSpot
   // tasks are emailed to testInbox instead, and the only HubSpot write is a
   // "[DRY RUN]" line in Metering Automation Log.
   dryRun: true,
   testInbox: 'rodrigo@impressivebatteries.com.au',
   fillerUrl: 'https://metering-applications.vercel.app',
-  docusealApi: 'https://docuseal.impressivebatteries.com.au/api',
   alertTo: 'rodrigo@impressivebatteries.com.au',
   taskOwnerId: '360340383',            // Rodrigo Candi
   stageAfterSend: '1509971393',        // Install Complete and metering forms submitted…
@@ -137,55 +136,99 @@ return [{ json: { ...i, task, properties } }];`));
 });
 
 // ───────────────────────── MTR – 10 Send Application ─────────────────────────
-// In: { job, retailer, deal, settings, dealUpdates, phase?: 'send', signedConsentUrl? }
+// In: { job, retailer, deal, settings, dealUpdates, phase?: 'send', signedConsentPdf?, consentAudit? }
+// Retailers needing the homeowner's signature (AGL) first get a signing link
+// emailed to the homeowner; MTR – 30 calls back here with phase 'send'.
 W.send = workflow('MTR – 10 Send Application', (w) => {
   const t = w.node('When Called', 'n8n-nodes-base.executeWorkflowTrigger', 1.1, { inputSource: 'passthrough' });
   const fresh = w.node('Re-read Deal', 'n8n-nodes-base.httpRequest', 4.2,
     hubspot('GET', `={{ '${HS}/crm/v3/objects/deals/' + $json.job.dealId + '?properties=metering_application_date,metering_status,metering_automation_log' }}`),
     { credentials: CRED.hubspot });
-  const plan = w.node('Plan', 'n8n-nodes-base.code', 2, code(`const i = $('When Called').first().json;
+  const guard = w.node('Guard', 'n8n-nodes-base.code', 2, code(`const i = $('When Called').first().json;
 const now = $input.first().json.properties;
 if (now.metering_application_date && !i.settings.dryRun) throw new Error('deal ' + i.job.dealId + ': already has a Metering Application Date; not sending again');
+return [{ json: { ...i, needsSignature: !!i.retailer.needsCustomerSignature && i.phase !== 'send' } }];`));
+  const sigIf = w.node('Needs Signature First?', 'n8n-nodes-base.if', 2.2, {
+    conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+      conditions: [{ id: 'sig', leftValue: '={{ $json.needsSignature }}', rightValue: true, operator: { type: 'boolean', operation: 'true', singleValue: true } }], combinator: 'and' },
+    looseTypeValidation: true, options: {},
+  });
+
+  // ── Signature branch: email the homeowner a signing link ──
+  const link = w.node('Get Signing Link (Vercel)', 'n8n-nodes-base.httpRequest', 4.2, {
+    method: 'POST', url: '={{ $json.settings.fillerUrl }}/api/sign-link',
+    authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth',
+    sendBody: true, specifyBody: 'json', jsonBody: '={{ JSON.stringify({ ...$json.job, signerEmail: $json.settings.dryRun ? $json.settings.testInbox : $json.job.accountHolder.email }) }}', options: {},
+  }, { credentials: CRED.filler, position: [960, -240] });
+  const inv = w.node('Compose Invite', 'n8n-nodes-base.code', 2, code(`const i = $('Guard').first().json;
+const l = $input.first().json;
+const s = i.settings;
+const h = i.job.accountHolder;
+const expires = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(l.expiresAt));
+const to = s.dryRun ? s.testInbox : h.email;
+const subject = (s.dryRun ? '[DRY RUN → ' + h.email + '] ' : '') + 'Please sign your AGL solar meter consent – ' + i.job.site.fullAddress;
+const body = 'Hi ' + h.firstName + ',\\n\\n'
+  + 'To get your meter set up for your new solar at ' + i.job.site.fullAddress + ', AGL needs your consent for us to lodge the request on your behalf.\\n\\n'
+  + 'It takes about a minute. Please check your details and sign here:\\n' + l.url + '\\n\\n'
+  + 'The link is just for you and works until ' + expires + '.\\n\\n'
+  + 'If you have any questions, call us on 1300 797 630.\\n\\n'
+  + 'Kind regards,\\nImpressive Team\\nIMPRESSIVE ELECTRICAL & SOLAR PTY LTD | 1300 797 630';
+return [{ json: { ...i, invite: { to, subject, body, expiresAt: l.expiresAt } } }];`), { position: [1200, -240] });
+  const invSend = w.node('Email Homeowner', 'n8n-nodes-base.gmail', 2.1, {
+    sendTo: '={{ $json.invite.to }}', subject: '={{ $json.invite.subject }}', emailType: 'text', message: '={{ $json.invite.body }}',
+    options: { appendAttribution: false, senderName: 'Impressive Team' },
+  }, { credentials: CRED.gmail, position: [1440, -240] });
+  const invUpd = w.node('Awaiting Signature Updates', 'n8n-nodes-base.code', 2, code(`${LOG_FN}
+const i = $('Compose Invite').first().json;
+const m = $input.first().json;
+const line = (i.settings.dryRun ? '[DRY RUN] ' : '') + 'AGL consent link emailed to ' + i.invite.to + ' (expires ' + i.invite.expiresAt.slice(0, 10) + ') msgId=' + m.id;
+const properties = { metering_automation_log: appendLog(i.deal.properties.metering_automation_log, line) };
+if (!i.settings.dryRun) Object.assign(properties, i.dealUpdates, { metering_status: 'Awaiting Customer Signature' });
+return [{ json: { dealId: i.job.dealId, properties } }];`), { position: [1680, -240] });
+  const invPatch = w.node('Update Deal (awaiting signature)', 'n8n-nodes-base.httpRequest', 4.2,
+    hubspot('PATCH', `={{ '${HS}/crm/v3/objects/deals/' + $json.dealId }}`, '={{ JSON.stringify({ properties: $json.properties }) }}'),
+    { credentials: CRED.hubspot, position: [1920, -240] });
+
+  // ── Send branch ──
+  const plan = w.node('Plan', 'n8n-nodes-base.code', 2, code(`const i = $('Guard').first().json;
 const r = i.retailer;
-const needsSignature = !!r.needsCustomerSignature && i.phase !== 'send';
 const files = [];
-if (needsSignature) {
-  files.push({ kind: 'filler', form: r.consentForm, name: 'AGL consent form.pdf' });
-} else {
-  for (const a of r.attachments) {
-    if (a === 'ea_form' || a === 'agl_form') files.push({ kind: 'filler', form: r.form + '-form', name: a === 'ea_form' ? 'EA Service Works Request.pdf' : 'AGL Application for Electricity.pdf', upload: true });
-    else if (a === 'ccew') files.push({ kind: 'hubspot', fileId: i.job.ccew.fileId, name: 'CCEW ' + i.job.ccew.receipt + '.pdf' });
-    else if (a === 'network_letter') files.push({ kind: 'hubspot', fileId: i.job.networkApproval.fileId, name: i.job.distributor + ' network approval.pdf' });
-    else if (a === 'agl_consent_signed') files.push({ kind: 'url', url: i.signedConsentUrl, name: 'AGL consent form (signed).pdf', upload: true });
+for (const a of r.attachments) {
+  if (a === 'ea_form' || a === 'agl_form') files.push({ kind: 'filler', form: r.form + '-form', name: a === 'ea_form' ? 'EA Service Works Request.pdf' : 'AGL Application for Electricity.pdf', upload: true });
+  else if (a === 'ccew') files.push({ kind: 'hubspot', fileId: i.job.ccew.fileId, name: 'CCEW ' + i.job.ccew.receipt + '.pdf' });
+  else if (a === 'network_letter') files.push({ kind: 'hubspot', fileId: i.job.networkApproval.fileId, name: i.job.distributor + ' network approval.pdf' });
+  else if (a === 'agl_consent_signed') {
+    if (!i.signedConsentPdf) throw new Error('deal ' + i.job.dealId + ': AGL needs the signed consent form but none was passed in');
+    files.push({ kind: 'inline', name: 'AGL consent form (signed).pdf', upload: true });
   }
 }
-return files.map((f, n) => ({ json: { ...f, n, needsSignature, job: i.job, fillerUrl: i.settings.fillerUrl } }));`));
+return files.map((f, n) => ({ json: { ...f, n, job: i.job, fillerUrl: i.settings.fillerUrl } }));`), { position: [960, 120] });
   const sw = w.node('By Source', 'n8n-nodes-base.switch', 3.2, {
-    rules: { values: ['filler', 'hubspot', 'url'].map((k) => ({
+    rules: { values: ['filler', 'hubspot', 'inline'].map((k) => ({
       conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
         conditions: [{ leftValue: '={{ $json.kind }}', rightValue: k, operator: { type: 'string', operation: 'equals' } }], combinator: 'and' },
       renameOutput: true, outputKey: k })) },
     options: {},
-  });
+  }, { position: [1200, 120] });
   const fil = w.node('Fill Form (Vercel)', 'n8n-nodes-base.httpRequest', 4.2, {
     method: 'POST', url: '={{ $json.fillerUrl }}/api/{{ $json.form }}',
     authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth',
     sendBody: true, specifyBody: 'json', jsonBody: '={{ JSON.stringify($json.job) }}',
     options: { response: { response: { responseFormat: 'file', outputPropertyName: 'data' } } },
-  }, { credentials: CRED.filler, onError: 'continueErrorOutput', y: -160 });
+  }, { credentials: CRED.filler, onError: 'continueErrorOutput', position: [1440, -40] });
   const sig = w.node('HubSpot Signed URL', 'n8n-nodes-base.httpRequest', 4.2, {
     ...hubspot('GET', `={{ '${HS}/files/v3/files/' + $json.fileId + '/signed-url' }}`),
-  }, { credentials: CRED.hubspot, onError: 'continueErrorOutput' });
+  }, { credentials: CRED.hubspot, onError: 'continueErrorOutput', position: [1440, 120] });
   const dlh = w.node('Download HubSpot File', 'n8n-nodes-base.httpRequest', 4.2, {
     url: '={{ $json.url }}', options: { response: { response: { responseFormat: 'file', outputPropertyName: 'data' } } },
-  }, { onError: 'continueErrorOutput' });
-  const dlu = w.node('Download Signed Consent', 'n8n-nodes-base.httpRequest', 4.2, {
-    url: '={{ $json.url }}', options: { response: { response: { responseFormat: 'file', outputPropertyName: 'data' } } },
-  }, { onError: 'continueErrorOutput', y: 160 });
-  const fail = w.node('File Failed', 'n8n-nodes-base.code', 2, code(`const i = $('When Called').first().json;
+  }, { onError: 'continueErrorOutput', position: [1680, 120] });
+  const inl = w.node('Signed Consent File', 'n8n-nodes-base.code', 2, code(`const i = $('Guard').first().json;
+return [{ json: {}, binary: { data: await this.helpers.prepareBinaryData(Buffer.from(i.signedConsentPdf, 'base64'), 'AGL consent form (signed).pdf', 'application/pdf') } }];`), { position: [1440, 280] });
+  const fail = w.node('File Failed', 'n8n-nodes-base.code', 2, code(`const i = $('Guard').first().json;
 const e = $input.first().json;
-throw new Error('deal ' + i.job.dealId + ': could not get an attachment: ' + (e.error?.message || JSON.stringify(e.error || e).slice(0, 300)));`), { y: 320 });
-  const merge = w.node('Collect Files', 'n8n-nodes-base.code', 2, code(`const i = $('When Called').first().json;
+throw new Error('deal ' + i.job.dealId + ': could not get an attachment: ' + (e.error?.message || JSON.stringify(e.error || e).slice(0, 300)));`), { position: [1920, 360] });
+  const wait = w.node('Wait For All Files', 'n8n-nodes-base.merge', 3, { numberInputs: 3 }, { position: [1920, 120] });
+  const merge = w.node('Collect Files', 'n8n-nodes-base.code', 2, code(`const i = $('Guard').first().json;
 const planned = $('Plan').all().map((p) => p.json);
 const got = $input.all();
 if (got.length !== planned.length) throw new Error('deal ' + i.job.dealId + ': expected ' + planned.length + ' attachments, got ' + got.length);
@@ -199,81 +242,36 @@ got.forEach((item, idx) => {
   files.push({ key, name: p.name, upload: !!p.upload });
 });
 files.sort((a, b) => a.key.localeCompare(b.key));
-return [{ json: { ...i, files, needsSignature: planned[0].needsSignature }, binary }];`), { position: [2160, 0] });
-  const route = w.node('Signature First?', 'n8n-nodes-base.if', 2.2, {
-    conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
-      conditions: [{ id: 'sig', leftValue: '={{ $json.needsSignature }}', rightValue: true, operator: { type: 'boolean', operation: 'true', singleValue: true } }], combinator: 'and' },
-    looseTypeValidation: true, options: {},
-  }, { position: [2400, 0] });
-
-  // Signature branch (AGL consent → DocuSeal)
-  const ds = w.node('Build DocuSeal Request', 'n8n-nodes-base.code', 2, code(`const i = $input.first().json;
-const s = i.settings;
-const map = ${json('forms/agl-consent-fieldmap.json')}.docuseal;
-const W = 595.276, H = 841.89;
-const area = (b) => ({ x: +(b.x / W).toFixed(4), y: +((H - b.y - b.h) / H).toFixed(4), w: +(b.w / W).toFixed(4), h: +(b.h / H).toFixed(4), page: b.page + 1 });
-const buf = await this.helpers.getBinaryDataBuffer(0, 'att0');
-const email = s.dryRun ? s.testInbox : i.job.accountHolder.email;
-const body = {
-  name: 'AGL consent – ' + i.job.accountHolder.fullName + ' – NMI ' + i.job.nmi,
-  send_email: true,
-  documents: [{ name: 'AGL consent form', file: buf.toString('base64'), fields: [
-    { name: 'Signature', type: 'signature', role: 'Homeowner', required: true, areas: [area(map.signature)] },
-    { name: 'Date', type: 'date', role: 'Homeowner', required: true, areas: [area(map.date)] },
-  ] }],
-  submitters: [{ role: 'Homeowner', email, name: i.job.accountHolder.fullName, external_id: String(i.job.dealId) }],
-  message: {
-    subject: (s.dryRun ? '[DRY RUN] ' : '') + 'Please sign your AGL solar meter consent – ' + i.job.site.fullAddress,
-    body: 'Hi ' + i.job.accountHolder.firstName + ',\\n\\nTo get your meter set up for solar, AGL needs your consent for us to lodge the request on your behalf. It takes a minute:\\n\\n{{submitter.link}}\\n\\nThanks,\\nImpressive Team',
-  },
-};
-return [{ json: { ...i, docusealBody: body } }];`), { position: [2640, -200] });
-  const dsPost = w.node('Create DocuSeal Submission', 'n8n-nodes-base.httpRequest', 4.2, {
-    method: 'POST', url: '={{ $json.settings.docusealApi }}/submissions/pdf',
-    authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth',
-    sendBody: true, specifyBody: 'json', jsonBody: '={{ JSON.stringify($json.docusealBody) }}', options: {},
-  }, { credentials: CRED.docuseal, position: [2880, -200] });
-  const dsUpd = w.node('Awaiting Signature Updates', 'n8n-nodes-base.code', 2, code(`${LOG_FN}
-const i = $('Build DocuSeal Request').first().json;
-const r = $input.first().json;
-const subId = r.id || (Array.isArray(r) ? r[0]?.submission_id : '') || r.submission_id || '';
-const line = (i.settings.dryRun ? '[DRY RUN] ' : '') + 'AGL consent sent to DocuSeal (submission ' + subId + ')';
-const properties = { metering_automation_log: appendLog(i.deal.properties.metering_automation_log, line) };
-if (!i.settings.dryRun) Object.assign(properties, i.dealUpdates, { metering_status: 'Awaiting Customer Signature' });
-return [{ json: { dealId: i.job.dealId, properties } }];`), { position: [3120, -200] });
-  const dsPatch = w.node('Update Deal (awaiting signature)', 'n8n-nodes-base.httpRequest', 4.2,
-    hubspot('PATCH', `={{ '${HS}/crm/v3/objects/deals/' + $json.dealId }}`, '={{ JSON.stringify({ properties: $json.properties }) }}'),
-    { credentials: CRED.hubspot, position: [3360, -200] });
-
-  // Send branch
+return [{ json: { ...i, files }, binary }];`), { position: [2160, 120] });
   const comp = w.node('Compose Email', 'n8n-nodes-base.code', 2, code(`${src('src/mtr/compose.js')}
 const templates = ${json('config/email-templates.json')};
 const item = $input.first();
 const i = item.json;
 const email = composeEmail(i.job, i.retailer, templates, i.settings);
-return [{ json: { ...i, email, attachmentKeys: i.files.map((f) => f.key).join(',') }, binary: item.binary }];`), { position: [2640, 160] });
+return [{ json: { ...i, email, attachmentKeys: i.files.map((f) => f.key).join(',') }, binary: item.binary }];`), { position: [2400, 120] });
   const send = w.node('Send Email', 'n8n-nodes-base.gmail', 2.1, {
     sendTo: '={{ $json.email.to }}', subject: '={{ $json.email.subject }}', emailType: 'text', message: '={{ $json.email.body }}',
     options: { appendAttribution: false, ccList: '={{ $json.email.cc }}', senderName: 'Impressive Team',
       attachmentsUi: { attachmentsBinary: [{ property: '={{ $json.attachmentKeys }}' }] } },
-  }, { credentials: CRED.gmail, position: [2880, 160] });
+  }, { credentials: CRED.gmail, position: [2640, 120] });
   const post = w.node('After Send', 'n8n-nodes-base.code', 2, code(`${LOG_FN}
 const i = $('Compose Email').first().json;
 const m = $input.first().json;
 const s = i.settings;
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
-const line = (s.dryRun ? '[DRY RUN] ' : '') + 'SENT ' + i.retailer.label + ' to ' + i.email.realTo + ' msgId=' + m.id + ' threadId=' + m.threadId;
+let line = (s.dryRun ? '[DRY RUN] ' : '') + 'SENT ' + i.retailer.label + ' to ' + i.email.realTo + ' msgId=' + m.id + ' threadId=' + m.threadId;
+if (i.consentAudit) line = (s.dryRun ? '[DRY RUN] ' : '') + 'Consent signed by ' + i.consentAudit.name + ' at ' + i.consentAudit.signedAt + ' IP ' + i.consentAudit.ip + '\\n' + line;
 const properties = { metering_automation_log: appendLog(i.deal.properties.metering_automation_log, line) };
 if (!s.dryRun) Object.assign(properties, i.dealUpdates, { metering_status: 'Metering Application Sent', metering_application_date: today, dealstage: s.stageAfterSend });
 const uploads = s.dryRun ? [] : i.files.filter((f) => f.upload);
-return [{ json: { dealId: i.job.dealId, properties, uploads, noteBody: 'Metering application emailed to ' + i.retailer.label + ' (' + i.email.realTo + '): ' + i.email.subject } }];`), { position: [3120, 160] });
+return [{ json: { dealId: i.job.dealId, properties, uploads, noteBody: 'Metering application emailed to ' + i.retailer.label + ' (' + i.email.realTo + '): ' + i.email.subject } }];`), { position: [2880, 120] });
   const patch = w.node('Update Deal (sent)', 'n8n-nodes-base.httpRequest', 4.2,
     hubspot('PATCH', `={{ '${HS}/crm/v3/objects/deals/' + $json.dealId }}`, '={{ JSON.stringify({ properties: $json.properties }) }}'),
-    { credentials: CRED.hubspot, position: [3360, 160] });
+    { credentials: CRED.hubspot, position: [3120, 120] });
   const split = w.node('Files To Upload', 'n8n-nodes-base.code', 2, code(`const a = $('After Send').first().json;
 const c = $('Compose Email').first();
 if (!a.uploads.length) return [];
-return a.uploads.map((u) => ({ json: { dealId: a.dealId, name: u.name }, binary: { data: c.binary[u.key] } }));`), { position: [3600, 160] });
+return a.uploads.map((u) => ({ json: { dealId: a.dealId, name: u.name }, binary: { data: c.binary[u.key] } }));`), { position: [3360, 120] });
   const up = w.node('Upload To HubSpot', 'n8n-nodes-base.httpRequest', 4.2, {
     method: 'POST', url: `${HS}/files/v3/files`, authentication: 'predefinedCredentialType', nodeCredentialType: 'hubspotAppToken',
     sendBody: true, contentType: 'multipart-form-data', bodyParameters: { parameters: [
@@ -282,21 +280,19 @@ return a.uploads.map((u) => ({ json: { dealId: a.dealId, name: u.name }, binary:
       { name: 'fileName', value: '={{ $json.dealId }} {{ $json.name }}' },
       { name: 'options', value: '{"access":"PRIVATE","overwrite":false}' },
     ] }, options: {},
-  }, { credentials: CRED.hubspot, position: [3840, 160] });
+  }, { credentials: CRED.hubspot, position: [3600, 120] });
   const note = w.node('Note On Deal', 'n8n-nodes-base.httpRequest', 4.2,
     hubspot('POST', `${HS}/crm/v3/objects/notes`, `={{ JSON.stringify({ properties: { hs_timestamp: new Date().toISOString(), hs_note_body: $('After Send').first().json.noteBody, hs_attachment_ids: $input.all().map((x) => x.json.id).join(';') }, associations: [{ to: { id: $('After Send').first().json.dealId }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }] }) }}`),
-    { credentials: CRED.hubspot, position: [4080, 160], executeOnce: true });
+    { credentials: CRED.hubspot, position: [3840, 120], executeOnce: true });
 
-  w.chain(t, fresh, plan, sw);
-  w.connect(sw, fil, 0); w.connect(sw, sig, 1); w.connect(sw, dlu, 2);
+  w.chain(t, fresh, guard, sigIf);
+  w.connect(sigIf, link, 0); w.chain(link, inv, invSend, invUpd, invPatch);
+  w.connect(sigIf, plan, 1); w.connect(plan, sw);
+  w.connect(sw, fil, 0); w.connect(sw, sig, 1); w.connect(sw, inl, 2);
   w.connect(sig, dlh, 0);
-  const wait = w.node('Wait For All Files', 'n8n-nodes-base.merge', 3, { numberInputs: 3 }, { position: [1920, 0] });
-  w.connect(fil, wait, 0, 0); w.connect(dlh, wait, 0, 1); w.connect(dlu, wait, 0, 2);
-  w.connect(wait, merge);
-  w.connect(fil, fail, 1); w.connect(sig, fail, 1); w.connect(dlh, fail, 1); w.connect(dlu, fail, 1);
-  w.connect(merge, route);
-  w.connect(route, ds, 0); w.chain(ds, dsPost, dsUpd, dsPatch);
-  w.connect(route, comp, 1); w.chain(comp, send, post, patch, split, up, note);
+  w.connect(fil, wait, 0, 0); w.connect(dlh, wait, 0, 1); w.connect(inl, wait, 0, 2);
+  w.connect(fil, fail, 1); w.connect(sig, fail, 1); w.connect(dlh, fail, 1);
+  w.chain(wait, merge, comp, send, post, patch, split, up, note);
 });
 
 // ───────────────────────── MTR – 02 Process Deal ─────────────────────────
@@ -374,38 +370,29 @@ return out;`));
   w.connect(iff, ex, 0); w.connect(iff, no, 1);
 });
 
-// ───────────────────────── MTR – 30 DocuSeal Completed ─────────────────────────
-W.docuseal = workflow('MTR – 30 DocuSeal Completed', (w) => {
-  const h = w.node('DocuSeal Webhook', 'n8n-nodes-base.webhook', 2, { httpMethod: 'POST', path: 'mtr-docuseal', responseMode: 'onReceived', options: {} }, { webhookId: 'mtr-docuseal' });
-  const p = w.node('Parse Event', 'n8n-nodes-base.code', 2, code(`const b = $input.first().json.body || {};
-const ev = b.event_type || '';
-const d = b.data || {};
-const submissionId = d.submission_id || d.submission?.id || (ev.startsWith('submission') ? d.id : null);
-if (!['form.completed', 'submission.completed'].includes(ev) || !submissionId) return [];
-return [{ json: { event: ev, submissionId } }];`));
-  const g = w.node('Get Submission', 'n8n-nodes-base.httpRequest', 4.2, {
-    url: "={{ 'https://docuseal.impressivebatteries.com.au/api/submissions/' + $json.submissionId }}",
-    authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth', options: {},
-  }, { credentials: CRED.docuseal });
-  const v = w.node('Check Completed', 'n8n-nodes-base.code', 2, code(`const s = $input.first().json;
-const sub = (s.submitters || [])[0] || {};
-if (s.status !== 'completed' && sub.status !== 'completed') return [];
-const dealId = sub.external_id;
-if (!dealId) throw new Error('DocuSeal submission ' + s.id + ' has no external_id (deal ID)');
-const doc = (s.documents || sub.documents || [])[0];
-if (!doc || !doc.url) throw new Error('deal ' + dealId + ': signed DocuSeal document URL missing (submission ' + s.id + ')');
-return [{ json: { dealId: String(dealId), signedConsentUrl: doc.url } }];`));
+// ───────────────────────── MTR – 30 Consent Signed ─────────────────────────
+// Called by the signing page (Vercel /api/sign-submit). Vercel /api/sign-finalize
+// re-checks the link and returns the signed PDF, then the AGL application is sent.
+W.consent = workflow('MTR – 30 Consent Signed', (w) => {
+  const h = w.node('Signing Page Webhook', 'n8n-nodes-base.webhook', 2, { httpMethod: 'POST', path: 'mtr-consent-signed', responseMode: 'responseNode', options: {} }, { webhookId: 'mtr-consent-signed' });
+  const fin = w.node('Signed PDF (Vercel)', 'n8n-nodes-base.httpRequest', 4.2, {
+    method: 'POST', url: 'https://metering-applications.vercel.app/api/sign-finalize',
+    authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth',
+    sendBody: true, specifyBody: 'json', jsonBody: '={{ JSON.stringify($json.body) }}', options: {},
+  }, { credentials: CRED.filler });
+  const ok = w.node('Reply To Page', 'n8n-nodes-base.respondToWebhook', 1.1, { respondWith: 'json', responseBody: '={{ JSON.stringify({ ok: true }) }}', options: {} });
   const st = w.node('Get Settings', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('settings')));
-  const din = w.node('Deal ID', 'n8n-nodes-base.code', 2, code(`return [{ json: { dealId: $('Check Completed').first().json.dealId } }];`));
+  const din = w.node('Deal ID', 'n8n-nodes-base.code', 2, code(`return [{ json: { dealId: String($('Signed PDF (Vercel)').first().json.dealId) } }];`));
   const bj = w.node('Build Job', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('buildJob')));
   const prep = w.node('Prepare Send', 'n8n-nodes-base.code', 2, code(`const r = $input.first().json;
-const c = $('Check Completed').first().json;
+const f = $('Signed PDF (Vercel)').first().json;
+const b = $('Signing Page Webhook').first().json.body;
 const settings = $('Get Settings').first().json;
 const status = r.deal.properties.metering_status;
-if (!settings.dryRun && status !== 'Awaiting Customer Signature') throw new Error('deal ' + c.dealId + ': consent signed but Metering Status is "' + status + '", not Awaiting Customer Signature; not sending');
-return [{ json: { ...r, settings, phase: 'send', signedConsentUrl: c.signedConsentUrl } }];`));
+if (!settings.dryRun && status !== 'Awaiting Customer Signature') throw new Error('deal ' + f.dealId + ': consent signed but Metering Status is "' + status + '", not Awaiting Customer Signature; not sending');
+return [{ json: { ...r, settings, phase: 'send', signedConsentPdf: f.pdf, consentAudit: { name: b.typedName, email: f.signerEmail, signedAt: b.signedAt, ip: b.ip } } }];`));
   const send = w.node('Send Application', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('send')));
-  w.chain(h, p, g, v, st, din, bj, prep, send);
+  w.chain(h, fin, ok, st, din, bj, prep, send);
 });
 
 // ───────────────────────── MTR – 05 Network Letter Intake ─────────────────────────

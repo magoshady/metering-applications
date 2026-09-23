@@ -9,7 +9,6 @@ const CRED = {
   hubspot: { hubspotAppToken: { id: 'DK6aUhoyZ42IbfNM', name: "Impressive Batterie's Hubspot" } },
   gmail: { gmailOAuth2: { id: 'bBoYFD6eHvB5ixtS', name: "Rod's Impressive Batteries' Email" } },
   filler: { httpHeaderAuth: { id: '4t99N3DNPPhFiej0', name: 'EA Filler' } },
-  docuseal: { httpHeaderAuth: { id: '3jRr6HHI4Wx4x1oP', name: 'Docuseal' } },
   anthropic: { anthropicApi: { id: 'Y5pXWsYFFWYhRrox', name: 'Anthropic account' } },
 };
 const ERROR_WORKFLOW_ID = 'CS7g4VWEMmGhn3DQ';

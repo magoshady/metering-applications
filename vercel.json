@@ -6,8 +6,28 @@
     "api/agl-form.js": {
       "includeFiles": "{forms/agl.pdf,forms/agl-fieldmap.json,config/contractors.json}"
     },
-    "api/agl-consent.js": {
-      "includeFiles": "{forms/agl-consent.pdf,forms/agl-fieldmap.json,forms/agl-consent-fieldmap.json,config/contractors.json}"
+    "api/sign-preview.js": {
+      "includeFiles": "{forms/agl.pdf,forms/agl-consent.pdf,forms/agl-fieldmap.json,forms/agl-consent-fieldmap.json,config/contractors.json}"
+    },
+    "api/sign-finalize.js": {
+      "includeFiles": "{forms/agl.pdf,forms/agl-consent.pdf,forms/agl-fieldmap.json,forms/agl-consent-fieldmap.json,config/contractors.json}"
     }
-  }
+  },
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/sign",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        }
+      ]
+    }
+  ]
 }
