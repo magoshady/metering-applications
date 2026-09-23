@@ -97,11 +97,21 @@
   },
   "red_energy": {
     "label": "Red Energy",
-    "route": "phone_manual",
-    "handler": "manual",
+    "route": "email_auto",
+    "to": [
+      "solarenquiries@redenergy.com.au"
+    ],
+    "cc": [],
+    "subjectTemplate": "Solar installed – NMI {{nmi}} – {{street}}, {{suburb}}",
+    "handler": "email",
+    "needsCustomerSignature": false,
+    "attachments": [
+      "ccew",
+      "network_letter"
+    ],
+    "bodyTemplate": "red_energy",
     "phone": "131 806",
-    "enabled": true,
-    "notes": "[CONFIRM] whether solarenquiries@redenergy.com.au is live."
+    "enabled": true
   },
   "powershop": {
     "label": "Powershop",

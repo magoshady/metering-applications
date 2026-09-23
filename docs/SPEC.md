@@ -378,6 +378,7 @@ One sender workflow for every `email_auto` retailer; `config/retailers.json` say
 - **AGL**: form `forms/agl.pdf` (AGL1629, June 2021). Not fillable: `forms/agl-fieldmap.json` holds box coordinates; filled by the Vercel function `POST /api/agl-form`. Addition/Alteration → Solar installation; Install controlled load if `dedicated_controlled_load = Yes - Add`, Other "Remove controlled load" if `Yes - Remove`. Section 3a = homeowner (name, mobile, email); **3b authorised contact = Rodrigo Candi / Impressive, who signs the application**. AGL also needs the homeowner's **consent form** (`forms/agl-consent.pdf`, AGL1295): filled by `POST /api/agl-consent` (organiser = Rodrigo / Impressive), signed by the homeowner in **DocuSeal** (areas in `forms/agl-consent-fieldmap.json`); `MTR – 30` sends the AGL email once it's signed. Section 4 = Sam Husband 279684C. Network approval goes in the PV SEG line. Attach AGL form + signed consent + CCEW + network letter. To `aglnewconns@agl.com.au`.
 - **GloBird**: network letter only. To `cs@globirdenergy.com.au`.
 - **Amber**: CCEW + network letter (approved for NSW). To `info@amber.com.au`.
+- **Red Energy**: CCEW + network letter to `solarenquiries@redenergy.com.au` (confirmed working). Body: solar installed at ADDRESS, NMI, files attached.
 - **1st Energy**: no email or process known → manual task (`MTR – 20`) until one is found.
 
 ### 6.7 `MTR – 20 Manual Task Handler` (Phase 3)
@@ -431,6 +432,8 @@ Daily 08:00 Australia/Sydney. Deals with `metering_status = Metering Application
 ---
 
 ## 8. Email templates
+
+All bodies live in `config/email-templates.json` (one per retailer, signed Impressive Team). The EA example below is the original draft.
 
 Plain, professional, Arial-style plain text (brand guide: emails in Arial/Calibri; tone approachable, professional, plain-spoken). Sign-off from the sending mailbox owner `[CONFIRM name/title]`.
 
