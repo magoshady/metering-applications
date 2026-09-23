@@ -8,7 +8,7 @@ const path = require('path');
 
 const BASE = 'https://n8n.nuevaenergy.com.au/api/v1';
 const IDS_FILE = path.join(__dirname, 'ids.json');
-const ORDER = ['settings', 'buildJob', 'manualTask', 'send', 'process', 'trigger', 'docuseal', 'letters', 'harness'];
+const ORDER = ['settings', 'buildJob', 'manualTask', 'send', 'process', 'trigger', 'docuseal', 'attachLetter', 'letters', 'harness'];
 
 const { execFileSync } = require('child_process');
 

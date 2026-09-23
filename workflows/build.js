@@ -76,6 +76,13 @@ W.buildJob = workflow('MTR – 03 Build Job', (w) => {
     hubspot('POST', `${HS}/crm/v3/objects/notes/search`,
       `={{ JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'associations.deal', operator: 'EQ', value: String($('Get Deal').first().json.id) }] }], properties: ['hs_note_body', 'hs_attachment_ids', 'hs_createdate'], sorts: [{ propertyName: 'hs_createdate', direction: 'DESCENDING' }], limit: 100 }) }}`),
     { credentials: CRED.hubspot });
+  const ids = w.node('Attachment IDs', 'n8n-nodes-base.code', 2, code(`const notes = $input.first().json.results || [];
+const out = [];
+for (const n of notes) for (const f of String(n.properties.hs_attachment_ids || '').split(';').filter(Boolean)) out.push({ json: { fileId: f, noteId: String(n.id) } });
+return out.length ? out.slice(0, 60) : [{ json: { fileId: 'none', noteId: '' } }];`));
+  const meta = w.node('File Names', 'n8n-nodes-base.httpRequest', 4.2,
+    hubspot('GET', `={{ '${HS}/files/v3/files/' + $json.fileId }}`),
+    { credentials: CRED.hubspot, onError: 'continueRegularOutput' });
   const b = w.node('Build Job', 'n8n-nodes-base.code', 2, code(`${src('src/normaliseRetailer.js')}
 ${src('src/mtr/buildJob.js')}
 const retailers = ${json('config/retailers.json')};
@@ -84,11 +91,14 @@ const deal = $('Get Deal').first().json;
 const contactRaw = $('Get Contact').first().json;
 const contact = contactRaw && contactRaw.id ? contactRaw : null;
 const notes = $('Get Notes').first().json.results || [];
-const result = buildJob({ deal, contact, notes, retailers, hubspotLabels });
+const files = $('File Names').all().map((f, i) => ({ ...$('Attachment IDs').itemMatching(i).json, name: f.json.name ? f.json.name + (f.json.extension ? '.' + f.json.extension : '') : '', createdAt: f.json.createdAt || '' })).filter((f) => f.name);
+const letterRules = ${json('config/network-letters.json')};
+const result = buildJob({ deal, contact, notes, files, retailers, hubspotLabels, letterRules });
+result.files = files.map((f) => f.name);
 const contacts = deal.associations?.contacts?.results || [];
 if (contacts.length > 1) result.reasons.push('Note: deal has ' + contacts.length + ' contacts; used the first');
 return [{ json: { ...result, deal: { id: String(deal.id), properties: deal.properties } } }];`));
-  w.chain(t, d, c, n, b);
+  w.chain(t, d, c, n, ids, meta, b);
 });
 
 // ───────────────────────── MTR – 20 Manual Task ─────────────────────────
@@ -280,7 +290,9 @@ return a.uploads.map((u) => ({ json: { dealId: a.dealId, name: u.name }, binary:
   w.chain(t, fresh, plan, sw);
   w.connect(sw, fil, 0); w.connect(sw, sig, 1); w.connect(sw, dlu, 2);
   w.connect(sig, dlh, 0);
-  w.connect(fil, merge, 0); w.connect(dlh, merge, 0); w.connect(dlu, merge, 0);
+  const wait = w.node('Wait For All Files', 'n8n-nodes-base.merge', 3, { numberInputs: 3 }, { position: [1920, 0] });
+  w.connect(fil, wait, 0, 0); w.connect(dlh, wait, 0, 1); w.connect(dlu, wait, 0, 2);
+  w.connect(wait, merge);
   w.connect(fil, fail, 1); w.connect(sig, fail, 1); w.connect(dlh, fail, 1); w.connect(dlu, fail, 1);
   w.connect(merge, route);
   w.connect(route, ds, 0); w.chain(ds, dsPost, dsUpd, dsPatch);
@@ -397,41 +409,49 @@ return [{ json: { ...r, settings, phase: 'send', signedConsentUrl: c.signedConse
 });
 
 // ───────────────────────── MTR – 05 Network Letter Intake ─────────────────────────
+// Distributor approval emails (the three PTC Gmail labels, read-only) → attach the
+// letter PDF to the deal under its original file name, unless a file with that
+// name is already attached. If the deal was on hold only for the missing letter,
+// clear the hold and run MTR – 02 again.
 const DISTRIBUTORS = [
-  { name: 'Endeavour', label: 'Label_5823373004158048354', skip: 'Thank you for your Application Submission', pick: '_PTC_' },
-  { name: 'Ausgrid', label: 'Label_3303489167417198909', skip: 'Thank you for your Application Submission', pick: null },
-  { name: 'Essential', label: 'Label_592177598515650554', skip: 'Essential Energy Connection Application Approved', pick: null },
+  { name: 'Endeavour', label: 'Label_5823373004158048354', skip: 'Thank you for your Application Submission' },
+  { name: 'Ausgrid', label: 'Label_3303489167417198909', skip: 'Thank you for your Application Submission' },
+  { name: 'Essential', label: 'Label_592177598515650554', skip: 'Essential Energy Connection Application Approved' },
 ];
 W.letters = workflow('MTR – 05 Network Letter Intake', (w) => {
+  const rulesJson = json('config/network-letters.json');
   const picks = DISTRIBUTORS.map((d, n) => {
     const g = w.node(`Gmail: ${d.name} letters`, 'n8n-nodes-base.gmailTrigger', 1.2, {
       pollTimes: { item: [{ mode: 'everyMinute' }] }, simple: false,
       filters: { labelIds: [d.label], readStatus: 'both' }, options: { downloadAttachments: true },
     }, { credentials: CRED.gmail, position: [0, (n - 1) * 200] });
-    const pk = w.node(`Pick PDF (${d.name})`, 'n8n-nodes-base.code', 2, code(`const rule = ${JSON.stringify(d)};
+    const pk = w.node(`Pick PDF (${d.name})`, 'n8n-nodes-base.code', 2, code(`const d = ${JSON.stringify(d)};
+const rule = (${rulesJson})[d.name] || {};
+const re = rule.fileName ? new RegExp(rule.fileName, 'i') : null;
 const out = [];
 for (const item of $input.all()) {
   const j = item.json;
   const subject = j.subject || j.headers?.subject || '';
-  if (rule.skip && subject.includes(rule.skip)) continue;
+  if (d.skip && subject.includes(d.skip)) continue;
   const bin = item.binary || {};
-  const keys = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));
-  const key = rule.pick ? keys.find((k) => (bin[k].fileName || '').toUpperCase().includes(rule.pick)) : (keys.includes('attachment_0') ? 'attachment_0' : keys[0]);
+  const pdfs = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));
+  // With a file-name rule, only the matching PDF is the approval; otherwise the first PDF.
+  const key = re ? pdfs.find((k) => re.test(bin[k].fileName || '')) : pdfs[0];
   if (!key) continue;
-  out.push({ json: { distributor: rule.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });
+  out.push({ json: { distributor: d.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });
 }
 return out;`), { position: [240, (n - 1) * 200] });
     w.connect(g, pk);
     return pk;
   });
+  const letters = w.node('Letters', 'n8n-nodes-base.noOp', 1, {}, { position: [480, 0] });
+  for (const pk of picks) w.connect(pk, letters);
   const ai = w.node('Read Letter (Claude)', '@n8n/n8n-nodes-langchain.anthropic', 1, {
     resource: 'document',
     modelId: { __rl: true, value: 'claude-sonnet-4-5-20250929', mode: 'list', cachedResultName: 'claude-sonnet-4-5-20250929' },
-    text: 'This PDF should be an NSW electricity distributor approval for a solar/battery connection (Ausgrid CNL, Endeavour PTC / connection of generator, Essential CSO/connection approval). Reply with JSON only, no prose: {"isApprovalLetter": true|false, "nmi": "<NMI exactly as printed>", "reference": "<the distributor\'s approval / job / reference number>", "distributor": "Ausgrid"|"Endeavour"|"Essential"}',
+    text: 'This PDF should be an NSW electricity distributor approval for a solar/battery connection (Ausgrid Notification Letter, Endeavour PTC / connection of generator, Essential connection approval). Reply with JSON only, no prose: {"isApprovalLetter": true|false, "nmi": "<NMI exactly as printed>", "reference": "<the distributor\'s approval / job / reference number>", "distributor": "Ausgrid"|"Endeavour"|"Essential"}',
     inputType: 'binary', binaryPropertyName: 'letter', options: {},
-  }, { credentials: CRED.anthropic, position: [480, 0] });
-  const letters = w.node('Letters', 'n8n-nodes-base.noOp', 1, {}, { position: [360, 0] });
-  for (const pk of picks) w.connect(pk, letters);
+  }, { credentials: CRED.anthropic, position: [720, 0] });
   const parse = w.node('Parse Letter', 'n8n-nodes-base.code', 2, code(`const out = [];
 $input.all().forEach((item, i) => {
   const src = $('Letters').itemMatching(i);
@@ -441,48 +461,93 @@ $input.all().forEach((item, i) => {
   if (!p.isApprovalLetter) return;
   const nmi = String(p.nmi || '').replace(/\\s/g, '').toUpperCase();
   if (!/^[A-Z0-9]{10,11}$/.test(nmi)) throw new Error('Network letter "' + src.json.fileName + '": NMI "' + p.nmi + '" not valid');
-  out.push({ json: { ...src.json, nmi, nmi10: nmi.slice(0, 10), reference: String(p.reference || '').trim(), distributor: p.distributor || src.json.distributor }, binary: src.binary });
+  out.push({ json: { ...src.json, nmi, nmi10: nmi.slice(0, 10), reference: String(p.reference || '').trim() }, binary: src.binary });
 });
-return out;`), { position: [720, 0] });
+return out;`), { position: [960, 0] });
+  const each = w.node('Attach Letter (each)', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('attachLetter'), 'each'), { position: [1200, 0] });
+  w.chain(letters, ai, parse, each);
+});
+
+// ───────────────────────── MTR – 06 Attach Letter ─────────────────────────
+// In: one letter { distributor, fileName, nmi, nmi10, reference, messageId } + binary.letter
+W.attachLetter = workflow('MTR – 06 Attach Letter', (w) => {
+  const t = w.node('When Called', 'n8n-nodes-base.executeWorkflowTrigger', 1.1, { inputSource: 'passthrough' });
   const find = w.node('Find Deal By NMI', 'n8n-nodes-base.httpRequest', 4.2,
-    hubspot('POST', `${HS}/crm/v3/objects/deals/search`, `={{ JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'nmi', operator: 'CONTAINS_TOKEN', value: $json.nmi10 + '*' }, { propertyName: 'pipeline', operator: 'EQ', value: '978394588' }] }], properties: ['dealname', 'nmi', 'network_approval_reference', 'electricity_distributor', 'metering_automation_log'], limit: 5 }) }}`),
-    { credentials: CRED.hubspot, position: [960, 0] });
+    hubspot('POST', `${HS}/crm/v3/objects/deals/search`, `={{ JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'nmi', operator: 'CONTAINS_TOKEN', value: $json.nmi10 + '*' }, { propertyName: 'pipeline', operator: 'EQ', value: '978394588' }] }], properties: ['dealname', 'nmi', 'network_approval_reference', 'electricity_distributor', 'metering_status', 'metering_automation_log'], limit: 5 }) }}`),
+    { credentials: CRED.hubspot, position: [1200, 0] });
   const one = w.node('Exactly One Deal', 'n8n-nodes-base.code', 2, code(`const out = [];
-$input.all().forEach((item, i) => {
-  const src = $('Parse Letter').itemMatching(i);
+$input.all().forEach((item) => {
+  const src = $('When Called').first();
   const hits = (item.json.results || []).filter((d) => String(d.properties.nmi || '').toUpperCase().replace(/\\s/g, '').startsWith(src.json.nmi10));
-  if (hits.length !== 1) throw new Error('Network letter NMI ' + src.json.nmi + ' (' + src.json.distributor + ', ref ' + src.json.reference + ') matched ' + hits.length + ' deals in the pipeline; attach it by hand');
-  out.push({ json: { ...src.json, dealId: hits[0].id, deal: hits[0].properties }, binary: src.binary });
+  if (hits.length !== 1) throw new Error('Network letter NMI ' + src.json.nmi + ' (' + src.json.distributor + ', ref ' + src.json.reference + ', file ' + src.json.fileName + ') matched ' + hits.length + ' deals in the pipeline; attach it by hand');
+  out.push({ json: { ...src.json, dealId: String(hits[0].id), deal: hits[0].properties }, binary: src.binary });
 });
-return out;`), { position: [1200, 0] });
+return out;`), { position: [1440, 0] });
+  const notes = w.node('Deal Notes', 'n8n-nodes-base.httpRequest', 4.2,
+    hubspot('POST', `${HS}/crm/v3/objects/notes/search`, `={{ JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'associations.deal', operator: 'EQ', value: $json.dealId }] }], properties: ['hs_attachment_ids'], limit: 100 }) }}`),
+    { credentials: CRED.hubspot, position: [1680, 0] });
+  const ids = w.node('Attached File IDs', 'n8n-nodes-base.code', 2, code(`const src = $('Exactly One Deal').first();
+const out = [];
+for (const n of $input.first().json.results || []) for (const f of String(n.properties.hs_attachment_ids || '').split(';').filter(Boolean)) out.push({ json: { fileId: f } });
+return out.length ? out.slice(0, 80) : [{ json: { fileId: 'none' } }];`), { position: [1920, 0], executeOnce: true });
+  const names = w.node('Attached File Names', 'n8n-nodes-base.httpRequest', 4.2, hubspot('GET', `={{ '${HS}/files/v3/files/' + $json.fileId }}`),
+    { credentials: CRED.hubspot, onError: 'continueRegularOutput', position: [2160, 0] });
+  const dup = w.node('Already Attached?', 'n8n-nodes-base.code', 2, code(`const src = $('Exactly One Deal').first();
+const norm = (s) => String(s || '').toLowerCase().replace(/\\.pdf$/, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const want = norm(src.json.fileName);
+const have = $input.all().map((f) => norm((f.json.name || '') + (f.json.extension ? '.' + f.json.extension : '')));
+const duplicate = have.includes(want);
+// testOnly (test harness): report and stop before any write.
+if (src.json.testOnly) return [{ json: { testOnly: true, duplicate, dealId: src.json.dealId, checked: have.length } }];
+if (duplicate) return [];
+return [src];`), { position: [2400, 0] });
+  const stopTest = w.node('Test Only?', 'n8n-nodes-base.if', 2.2, {
+    conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+      conditions: [{ id: 't', leftValue: '={{ $json.testOnly }}', rightValue: true, operator: { type: 'boolean', operation: 'true', singleValue: true } }], combinator: 'and' },
+    looseTypeValidation: true, options: {},
+  }, { position: [2520, 160] });
   const up = w.node('Upload Letter', 'n8n-nodes-base.httpRequest', 4.2, {
     method: 'POST', url: `${HS}/files/v3/files`, authentication: 'predefinedCredentialType', nodeCredentialType: 'hubspotAppToken',
     sendBody: true, contentType: 'multipart-form-data', bodyParameters: { parameters: [
       { parameterType: 'formBinaryData', name: 'file', inputDataFieldName: 'letter' },
       { name: 'folderPath', value: '/metering/network-letters' },
-      { name: 'fileName', value: '={{ $json.dealId }} {{ $json.distributor }} network approval {{ $json.reference }}.pdf' },
-      { name: 'options', value: '{"access":"PRIVATE","overwrite":false}' },
+      { name: 'fileName', value: '={{ $json.fileName }}' },
+      { name: 'options', value: '{"access":"PRIVATE","overwrite":false,"duplicateValidationStrategy":"NONE"}' },
     ] }, options: {},
-  }, { credentials: CRED.hubspot, position: [1440, 0] });
+  }, { credentials: CRED.hubspot, position: [2640, 0] });
   const note = w.node('Note On Deal', 'n8n-nodes-base.httpRequest', 4.2,
-    hubspot('POST', `${HS}/crm/v3/objects/notes`, `={{ JSON.stringify({ properties: { hs_timestamp: new Date().toISOString(), hs_note_body: 'Network approval ' + $('Exactly One Deal').item.json.reference + ' (' + $('Exactly One Deal').item.json.distributor + ') attached via n8n', hs_attachment_ids: String($json.id) }, associations: [{ to: { id: $('Exactly One Deal').item.json.dealId }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }] }) }}`),
-    { credentials: CRED.hubspot, position: [1680, 0] });
+    hubspot('POST', `${HS}/crm/v3/objects/notes`, `={{ JSON.stringify({ properties: { hs_timestamp: new Date().toISOString(), hs_note_body: 'Network approval ' + $('Already Attached?').first().json.reference + ' (' + $('Already Attached?').first().json.distributor + ') attached via n8n', hs_attachment_ids: String($json.id) }, associations: [{ to: { id: $('Already Attached?').first().json.dealId }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }] }) }}`),
+    { credentials: CRED.hubspot, position: [2880, 0] });
   const upd = w.node('Deal Updates', 'n8n-nodes-base.code', 2, code(`${LOG_FN}
-return $input.all().map((item, i) => {
-  const s = $('Exactly One Deal').itemMatching(i).json;
-  const f = $('Upload Letter').itemMatching(i).json;
-  const properties = {
-    network_approval_reference: s.reference,
-    network_approval_letter_url: f.url || '',
-    metering_automation_log: appendLog(s.deal.metering_automation_log, 'Network approval ' + s.reference + ' attached (file ' + f.id + ')'),
-  };
-  if (!s.deal.electricity_distributor && ['Ausgrid', 'Endeavour', 'Essential'].includes(s.distributor)) properties.electricity_distributor = s.distributor;
-  return { json: { dealId: s.dealId, properties } };
-});`), { position: [1920, 0] });
+const s = $('Already Attached?').first().json;
+const f = $('Upload Letter').first().json;
+const properties = {
+  network_approval_reference: s.reference || s.deal.network_approval_reference || '',
+  network_approval_letter_url: f.url || '',
+};
+if (!s.deal.electricity_distributor && ['Ausgrid', 'Endeavour', 'Essential'].includes(s.distributor)) properties.electricity_distributor = s.distributor;
+// Re-run the deal if it is on hold and every reason in the last HOLD line was about the network letter.
+const lastHold = String(s.deal.metering_automation_log || '').split('\\n').reverse().find((l) => / HOLD: /.test(l)) || '';
+const reasons = lastHold.split(' HOLD: ')[1]?.split('; ') || [];
+const onlyLetter = reasons.length > 0 && reasons.every((r) => /network approval/i.test(r));
+const retry = s.deal.metering_status === 'Metering Issues Not Sent On Hold' && onlyLetter;
+if (retry) properties.metering_status = '';
+properties.metering_automation_log = appendLog(s.deal.metering_automation_log, 'Network approval ' + s.reference + ' attached (' + s.fileName + ')' + (retry ? '; hold cleared, re-running' : ''));
+return [{ json: { dealId: s.dealId, properties, retry } }];`), { position: [3120, 0] });
   const patch = w.node('Update Deal', 'n8n-nodes-base.httpRequest', 4.2,
     hubspot('PATCH', `={{ '${HS}/crm/v3/objects/deals/' + $json.dealId }}`, '={{ JSON.stringify({ properties: $json.properties }) }}'),
-    { credentials: CRED.hubspot, position: [2160, 0] });
-  w.chain(letters, ai, parse, find, one, up, note, upd, patch);
+    { credentials: CRED.hubspot, position: [3360, 0] });
+  const retry = w.node('Retry?', 'n8n-nodes-base.if', 2.2, {
+    conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+      conditions: [{ id: 'r', leftValue: "={{ $('Deal Updates').first().json.retry }}", rightValue: true, operator: { type: 'boolean', operation: 'true', singleValue: true } }], combinator: 'and' },
+    looseTypeValidation: true, options: {},
+  }, { position: [3600, 0] });
+  const again = w.node('Re-run Deal', 'n8n-nodes-base.code', 2, code(`return [{ json: { dealId: $('Deal Updates').first().json.dealId, messageId: '' } }];`), { position: [3840, 0] });
+  const proc = w.node('Process Deal', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('process')), { position: [4080, 0] });
+  w.chain(t, find, one, notes, ids, names, dup, stopTest);
+  w.connect(stopTest, up, 1);
+  w.chain(up, note, upd, patch, retry);
+  w.connect(retry, again, 0); w.connect(again, proc);
 });
 
 // ───────────────────────── MTR – T Test Harness ─────────────────────────
@@ -494,9 +559,9 @@ W.harness = workflow('MTR – T Test Harness', (w) => {
   const chk = w.node('Check Token', 'n8n-nodes-base.code', 2, code(`const j = $input.first().json;
 if ((j.headers || {})['x-mtr-test'] !== ${JSON.stringify(token)}) throw new Error('bad test token');
 const b = j.body || {};
-return [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter: !!b.pretendLetter, asRetailer: b.asRetailer || '', messageId: '' } }];`));
+return [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter: !!b.pretendLetter, asRetailer: b.asRetailer || '', messageId: '', letter: b.letter || null } }];`));
   const sw = w.node('By Mode', 'n8n-nodes-base.switch', 3.2, {
-    rules: { values: ['job', 'process', 'send'].map((k) => ({
+    rules: { values: ['job', 'process', 'send', 'letter'].map((k) => ({
       conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
         conditions: [{ leftValue: '={{ $json.mode }}', rightValue: k, operator: { type: 'string', operation: 'equals' } }], combinator: 'and' },
       renameOutput: true, outputKey: k })) }, options: {},
@@ -504,7 +569,7 @@ return [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter
   // job: read-only
   const bj = w.node('Build Job', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('buildJob')), { position: [960, -200] });
   const out = w.node('Result', 'n8n-nodes-base.code', 2, code(`const r = $input.first().json;
-return [{ json: { action: r.action, reasons: r.reasons, retailerKey: r.retailerKey, job: r.job, dealUpdates: r.dealUpdates } }];`), { position: [1200, -200] });
+return [{ json: { action: r.action, reasons: r.reasons, retailerKey: r.retailerKey, job: r.job, dealUpdates: r.dealUpdates, files: r.files } }];`), { position: [1200, -200] });
   // process: the real MTR – 02 path without a Gmail message (dry-run settings apply)
   const pr = w.node('Process Deal', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('process')), { position: [960, 0] });
   const prOut = w.node('Process Result', 'n8n-nodes-base.code', 2, code(`return [{ json: { ok: true, items: $input.all().map((i) => i.json) } }];`), { position: [1200, 0] });
@@ -532,6 +597,13 @@ if (r.action !== 'email') throw new Error('deal ' + r.dealId + ' is not sendable
 return [{ json: { ...r, settings } }];`), { position: [1680, 200] });
   const sd = w.node('Send Application', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('send')), { position: [1920, 200] });
   const sdOut = w.node('Send Result', 'n8n-nodes-base.code', 2, code(`return [{ json: { ok: true, items: $input.all().map((i) => i.json) } }];`), { position: [2160, 200] });
+  // letter: run MTR – 06 with a letter described in the body (dummy PDF). Use a file name that is already on the deal to test the duplicate check without writing.
+  const lt = w.node('Letter Input', 'n8n-nodes-base.code', 2, code(`const l = $('Check Token').first().json.letter;
+const nmi = String(l.nmi).toUpperCase();
+return [{ json: { distributor: l.distributor, fileName: l.fileName, nmi, nmi10: nmi.slice(0, 10), reference: l.reference || '', messageId: '', testOnly: true }, binary: { letter: await this.helpers.prepareBinaryData(Buffer.from('%PDF-1.4 test'), l.fileName, 'application/pdf') } }];`), { position: [960, 400] });
+  const al = w.node('Attach Letter', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('attachLetter')), { position: [1200, 400] });
+  const alOut = w.node('Letter Result', 'n8n-nodes-base.code', 2, code(`return [{ json: { ok: true, items: $input.all().map((i) => i.json) } }];`), { position: [1440, 400], alwaysOutputData: true });
+  w.connect(sw, lt, 3); w.chain(lt, al, alOut);
   w.chain(h, chk, sw);
   w.connect(sw, bj, 0); w.connect(bj, out);
   w.connect(sw, pr, 1); w.connect(pr, prOut);
