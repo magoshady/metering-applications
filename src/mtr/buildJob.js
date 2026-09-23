@@ -15,9 +15,16 @@ const PORTAL = { id: '441838848', host: 'app-ap1.hubspot.com' };
 
 const blank = (v) => v == null || String(v).trim() === '';
 
-/** "U6 186 Penshurst St", "6/186 Penshurst Street", "Unit 6, 186 X Rd", "186 X St" */
-function parseStreet(address) {
-  const a = String(address || '').replace(/\s+/g, ' ').replace(/,/g, ' ').trim();
+/**
+ * "U6 186 Penshurst St", "6/186 Penshurst Street", "Unit 6, 186 X Rd", "186 X St",
+ * and full addresses like "2 Slessor Pl, Heathcote NSW 2233" (suburb/state/postcode dropped).
+ */
+function parseStreet(address, suburb = '') {
+  let parts = String(address || '').split(',').map((x) => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (parts.length > 1 && /^(unit|u|apt|apartment|flat|shop)\s*[\w-]+$/i.test(parts[0])) parts = [`${parts[0]} ${parts[1]}`, ...parts.slice(2)];
+  let a = parts[0] || '';
+  a = a.replace(/\s+(NSW|VIC|QLD|ACT|SA|WA|TAS|NT)\b.*$/i, '').trim();
+  if (suburb) a = a.replace(new RegExp(`\\s+${suburb.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'), '').trim();
   if (!a) return null;
   let m = a.match(/^(?:(?:unit|u|apt|apartment|flat|shop)\s*([\w-]+)\s+|([\w-]+)\s*\/\s*)?(\d+[a-z]?(?:-\d+[a-z]?)?)\s+(.+)$/i);
   if (!m) return null;
@@ -66,17 +73,29 @@ function findNoteAttachment(notes, test) {
   return null;
 }
 
+/** Newest attachment whose file name matches the distributor's rule. */
+function findLetterFile(files, distributor, letterRules) {
+  const rule = letterRules && letterRules[distributor];
+  if (!rule || !rule.fileName) return null;
+  const re = new RegExp(rule.fileName, 'i');
+  const hits = (files || []).filter((f) => re.test(f.name || ''));
+  hits.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  return hits[0] || null;
+}
+
 /**
  * @param {object} input
  * @param {object} input.deal HubSpot deal { id, properties }
  * @param {object|null} input.contact primary contact { id, properties }
  * @param {object[]} input.notes notes on the deal { id, properties: { hs_note_body, hs_attachment_ids, hs_createdate } }
+ * @param {object[]} [input.files] attachments on the deal { fileId, noteId, name, createdAt }
+ * @param {object} [input.letterRules] config/network-letters.json
  * @param {object} input.retailers config/retailers.json
  * @param {object} input.hubspotLabels { retailer: {key: label}, route: {key: label} } from config/hubspot-properties.json
  * @returns {{ action: 'duplicate'|'skip'|'hold'|'email'|'manual', dealId: string, reasons: string[],
  *   retailerKey: string, retailer: object, job: object, dealUpdates: object }}
  */
-function buildJob({ deal, contact, notes, retailers, hubspotLabels }) {
+function buildJob({ deal, contact, notes, files = [], retailers, hubspotLabels, letterRules = {} }) {
   const p = deal.properties || {};
   const c = (contact && contact.properties) || {};
   const dealId = String(deal.id);
@@ -86,7 +105,7 @@ function buildJob({ deal, contact, notes, retailers, hubspotLabels }) {
   const retailerKey = norm.key;
   const retailer = retailers[retailerKey] || retailers.invalid;
 
-  const street = parseStreet(c.address);
+  const street = parseStreet(c.address, c.city);
   const site = {
     lot: '',
     unit: street?.unit || '',
@@ -105,7 +124,8 @@ function buildJob({ deal, contact, notes, retailers, hubspotLabels }) {
 
   const receipt = String(p.ccew_receipt_number || '').trim();
   const ccewNote = receipt ? findNoteAttachment(notes, (t) => /^ccew\b/i.test(t) && t.includes(receipt)) : null;
-  const letterNote = findNoteAttachment(notes, (t) => /^network approval\b/i.test(t));
+  const letterNote = findLetterFile(files, p.electricity_distributor, letterRules)
+    || findNoteAttachment(notes, (t) => /^network approval\b/i.test(t));
   const installDate = sydneyDate(p.installation_date);
   const kwNum = Number(p.sf_system_size_kw_stc);
 
@@ -183,7 +203,12 @@ function buildJob({ deal, contact, notes, retailers, hubspotLabels }) {
     else if (!ccewNote) reasons.push(`No note with the CCEW ${receipt} attachment`);
   }
   if (needs.has('network_letter')) {
-    if (!job.networkApproval.fileId) reasons.push('No network approval letter on the deal (note starting "Network approval" with the PDF attached)');
+    if (!job.networkApproval.fileId) {
+      const rule = letterRules[job.distributor];
+      reasons.push(rule && rule.fileName
+        ? `No ${job.distributor} network approval letter attached (file name matching "${rule.fileName}")`
+        : `No rule yet for finding the ${job.distributor || 'distributor'} network approval letter; attach it as a note starting "Network approval"`);
+    }
     if (!job.networkApproval.reference) reasons.push('Network approval reference (or DER register number) is empty');
   }
   if (retailer.form) {
@@ -200,5 +225,5 @@ function buildJob({ deal, contact, notes, retailers, hubspotLabels }) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { buildJob, parseStreet, auMobile, sydneyDate, findNoteAttachment };
+  module.exports = { buildJob, parseStreet, auMobile, sydneyDate, findNoteAttachment, findLetterFile };
 }

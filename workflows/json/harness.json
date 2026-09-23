@@ -148,7 +148,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const r = $input.first().json;\nreturn [{ json: { action: r.action, reasons: r.reasons, retailerKey: r.retailerKey, job: r.job, dealUpdates: r.dealUpdates } }];"
+        "jsCode": "const r = $input.first().json;\nreturn [{ json: { action: r.action, reasons: r.reasons, retailerKey: r.retailerKey, job: r.job, dealUpdates: r.dealUpdates, files: r.files } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

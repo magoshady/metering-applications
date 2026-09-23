@@ -1,0 +1,6 @@
+{
+  "_about": "How MTR – 03 finds the network approval letter among a deal's HubSpot attachments (file names, case-insensitive regex). Newest match wins. A note starting 'Network approval' (written by MTR – 05) is also accepted.",
+  "Ausgrid": { "fileName": "^Notification Letter", "_note": "[CONFIRM] Notification Letter vs 'APPLICATION - JOB ISSUED'" },
+  "Endeavour": { "fileName": "_PTC_", "_note": "Same rule as the Endeavour PTC workflow" },
+  "Essential": { "fileName": null, "_note": "[CONFIRM] file name pattern; none seen on deals yet" }
+}

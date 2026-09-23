@@ -76,6 +76,13 @@ W.buildJob = workflow('MTR – 03 Build Job', (w) => {
     hubspot('POST', `${HS}/crm/v3/objects/notes/search`,
       `={{ JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'associations.deal', operator: 'EQ', value: String($('Get Deal').first().json.id) }] }], properties: ['hs_note_body', 'hs_attachment_ids', 'hs_createdate'], sorts: [{ propertyName: 'hs_createdate', direction: 'DESCENDING' }], limit: 100 }) }}`),
     { credentials: CRED.hubspot });
+  const ids = w.node('Attachment IDs', 'n8n-nodes-base.code', 2, code(`const notes = $input.first().json.results || [];
+const out = [];
+for (const n of notes) for (const f of String(n.properties.hs_attachment_ids || '').split(';').filter(Boolean)) out.push({ json: { fileId: f, noteId: String(n.id) } });
+return out.length ? out.slice(0, 60) : [{ json: { fileId: 'none', noteId: '' } }];`));
+  const meta = w.node('File Names', 'n8n-nodes-base.httpRequest', 4.2,
+    hubspot('GET', `={{ '${HS}/files/v3/files/' + $json.fileId }}`),
+    { credentials: CRED.hubspot, onError: 'continueRegularOutput' });
   const b = w.node('Build Job', 'n8n-nodes-base.code', 2, code(`${src('src/normaliseRetailer.js')}
 ${src('src/mtr/buildJob.js')}
 const retailers = ${json('config/retailers.json')};
@@ -84,11 +91,14 @@ const deal = $('Get Deal').first().json;
 const contactRaw = $('Get Contact').first().json;
 const contact = contactRaw && contactRaw.id ? contactRaw : null;
 const notes = $('Get Notes').first().json.results || [];
-const result = buildJob({ deal, contact, notes, retailers, hubspotLabels });
+const files = $('File Names').all().map((f, i) => ({ ...$('Attachment IDs').itemMatching(i).json, name: f.json.name ? f.json.name + (f.json.extension ? '.' + f.json.extension : '') : '', createdAt: f.json.createdAt || '' })).filter((f) => f.name);
+const letterRules = ${json('config/network-letters.json')};
+const result = buildJob({ deal, contact, notes, files, retailers, hubspotLabels, letterRules });
+result.files = files.map((f) => f.name);
 const contacts = deal.associations?.contacts?.results || [];
 if (contacts.length > 1) result.reasons.push('Note: deal has ' + contacts.length + ' contacts; used the first');
 return [{ json: { ...result, deal: { id: String(deal.id), properties: deal.properties } } }];`));
-  w.chain(t, d, c, n, b);
+  w.chain(t, d, c, n, ids, meta, b);
 });
 
 // ───────────────────────── MTR – 20 Manual Task ─────────────────────────
@@ -506,7 +516,7 @@ return [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter
   // job: read-only
   const bj = w.node('Build Job', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('buildJob')), { position: [960, -200] });
   const out = w.node('Result', 'n8n-nodes-base.code', 2, code(`const r = $input.first().json;
-return [{ json: { action: r.action, reasons: r.reasons, retailerKey: r.retailerKey, job: r.job, dealUpdates: r.dealUpdates } }];`), { position: [1200, -200] });
+return [{ json: { action: r.action, reasons: r.reasons, retailerKey: r.retailerKey, job: r.job, dealUpdates: r.dealUpdates, files: r.files } }];`), { position: [1200, -200] });
   // process: the real MTR – 02 path without a Gmail message (dry-run settings apply)
   const pr = w.node('Process Deal', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('process')), { position: [960, 0] });
   const prOut = w.node('Process Result', 'n8n-nodes-base.code', 2, code(`return [{ json: { ok: true, items: $input.all().map((i) => i.json) } }];`), { position: [1200, 0] });

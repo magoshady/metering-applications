@@ -33,6 +33,9 @@ test('parses the address shapes we see', () => {
   assert.deepStrictEqual(parseStreet('6/186 Penshurst Street'), { unit: '6', streetNumber: '186', streetName: 'Penshurst', streetType: 'Street' });
   assert.deepStrictEqual(parseStreet('12 Kings Cross Road'), { unit: '', streetNumber: '12', streetName: 'Kings Cross', streetType: 'Road' });
   assert.deepStrictEqual(parseStreet('Unit 3, 4a Smith Ave'), { unit: '3', streetNumber: '4a', streetName: 'Smith', streetType: 'Ave' });
+  assert.deepStrictEqual(parseStreet('2 Slessor Pl, Heathcote NSW 2233', 'Heathcote'), { unit: '', streetNumber: '2', streetName: 'Slessor', streetType: 'Pl' });
+  assert.deepStrictEqual(parseStreet('71 Deakin St Silverwater NSW 2128', 'Silverwater'), { unit: '', streetNumber: '71', streetName: 'Deakin', streetType: 'St' });
+  assert.deepStrictEqual(parseStreet('31 Smarts Crescent, Burraneer, NSW, 2230', 'Burraneer'), { unit: '', streetNumber: '31', streetName: 'Smarts', streetType: 'Crescent' });
   assert.strictEqual(parseStreet('Lot 5 somewhere'), null);
   assert.strictEqual(parseStreet(''), null);
 });
@@ -64,6 +67,25 @@ test('an existing metering status is a duplicate', () => {
 test('battery only with an existing smart meter is skipped', () => {
   const d = deal(); d.properties.installation_type = 'Battery Only'; d.properties.existing_smart_meter = 'Yes - Non Intellihub Smart Meter';
   assert.strictEqual(run(d).action, 'skip');
+});
+
+test('Ausgrid letter found by attachment file name, newest first', () => {
+  const letterRules = require('../config/network-letters.json');
+  const files = [
+    { fileId: '900', name: 'Notification Letter 71 Deakin St.pdf', createdAt: '2026-09-01' },
+    { fileId: '901', name: 'Notification Letter 71 Deakin St (1).pdf', createdAt: '2026-09-05' },
+    { fileId: '902', name: 'Connection Application 71 Deakin St.pdf', createdAt: '2026-09-06' },
+  ];
+  const r = buildJob({ deal: deal(), contact, notes: notes.slice(0, 2), files, retailers, hubspotLabels: labels, letterRules });
+  assert.strictEqual(r.action, 'email', r.reasons.join());
+  assert.strictEqual(r.job.networkApproval.fileId, '901');
+});
+
+test('Endeavour letter uses the _PTC_ rule', () => {
+  const letterRules = require('../config/network-letters.json');
+  const d = deal(); d.properties.electricity_distributor = 'Endeavour';
+  const files = [{ fileId: '1', name: 'G-380200_20260827.pdf' }, { fileId: '2', name: 'G-380200_PTC_20260827.pdf' }];
+  assert.strictEqual(buildJob({ deal: d, contact, notes: notes.slice(0, 2), files, retailers, hubspotLabels: labels, letterRules }).job.networkApproval.fileId, '2');
 });
 
 test('missing network letter holds with a clear reason', () => {
