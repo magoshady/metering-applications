@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const j = $input.first().json;\nif ((j.headers || {})['x-mtr-test'] !== \"58bed84fb4c24a45ed5c6fd6018fff5230ebc19425d83e8d\") throw new Error('bad test token');\nconst b = j.body || {};\nreturn [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter: !!b.pretendLetter, asRetailer: b.asRetailer || '', messageId: '', letter: b.letter || null } }];"
+        "jsCode": "const j = $input.first().json;\nif ((j.headers || {})['x-mtr-test'] !== \"58bed84fb4c24a45ed5c6fd6018fff5230ebc19425d83e8d\") throw new Error('bad test token');\nconst b = j.body || {};\nif (b.mode === 'ping') return (b.urls || []).map((u) => ({ json: { mode: 'ping', url: u } }));\nreturn [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter: !!b.pretendLetter, asRetailer: b.asRetailer || '', messageId: '', letter: b.letter || null } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -126,6 +126,29 @@
               },
               "renameOutput": true,
               "outputKey": "letter"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "ping",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ping"
             }
           ]
         },
@@ -405,6 +428,41 @@
       "id": "fdf58d00-5c24-4754-a185-5a989fc96763",
       "name": "Letter Result",
       "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        600
+      ],
+      "id": "c117d3fa-1dd6-47b4-a872-550a53266c37",
+      "name": "Ping"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { results: $input.all().map((r, i) => ({ url: $('Check Token').all()[i]?.json.url, status: r.json.statusCode, body: String(r.json.body || '').slice(0, 120) })) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        600
+      ],
+      "id": "03a5d220-e477-4ffb-a218-86e82d266dd9",
+      "name": "Ping Result"
     }
   ],
   "connections": {
@@ -437,6 +495,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Ping",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -456,6 +521,17 @@
         [
           {
             "node": "Letter Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ping": {
+      "main": [
+        [
+          {
+            "node": "Ping Result",
             "type": "main",
             "index": 0
           }

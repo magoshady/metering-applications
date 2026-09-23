@@ -546,9 +546,10 @@ W.harness = workflow('MTR – T Test Harness', (w) => {
   const chk = w.node('Check Token', 'n8n-nodes-base.code', 2, code(`const j = $input.first().json;
 if ((j.headers || {})['x-mtr-test'] !== ${JSON.stringify(token)}) throw new Error('bad test token');
 const b = j.body || {};
+if (b.mode === 'ping') return (b.urls || []).map((u) => ({ json: { mode: 'ping', url: u } }));
 return [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter: !!b.pretendLetter, asRetailer: b.asRetailer || '', messageId: '', letter: b.letter || null } }];`));
   const sw = w.node('By Mode', 'n8n-nodes-base.switch', 3.2, {
-    rules: { values: ['job', 'process', 'send', 'letter'].map((k) => ({
+    rules: { values: ['job', 'process', 'send', 'letter', 'ping'].map((k) => ({
       conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
         conditions: [{ leftValue: '={{ $json.mode }}', rightValue: k, operator: { type: 'string', operation: 'equals' } }], combinator: 'and' },
       renameOutput: true, outputKey: k })) }, options: {},
@@ -591,6 +592,10 @@ return [{ json: { distributor: l.distributor, fileName: l.fileName, nmi, nmi10: 
   const al = w.node('Attach Letter', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('attachLetter')), { position: [1200, 400] });
   const alOut = w.node('Letter Result', 'n8n-nodes-base.code', 2, code(`return [{ json: { ok: true, items: $input.all().map((i) => i.json) } }];`), { position: [1440, 400], alwaysOutputData: true });
   w.connect(sw, lt, 3); w.chain(lt, al, alOut);
+  // ping: status codes of public URLs as n8n sees them (no auth sent)
+  const pg = w.node('Ping', 'n8n-nodes-base.httpRequest', 4.2, { url: '={{ $json.url }}', options: { response: { response: { fullResponse: true, neverError: true, responseFormat: 'text' } } } }, { position: [960, 600] });
+  const pgOut = w.node('Ping Result', 'n8n-nodes-base.code', 2, code(`return [{ json: { results: $input.all().map((r, i) => ({ url: $('Check Token').all()[i]?.json.url, status: r.json.statusCode, body: String(r.json.body || '').slice(0, 120) })) } }];`), { position: [1200, 600] });
+  w.connect(sw, pg, 4); w.connect(pg, pgOut);
   w.chain(h, chk, sw);
   w.connect(sw, bj, 0); w.connect(bj, out);
   w.connect(sw, pr, 1); w.connect(pr, prOut);
