@@ -1,0 +1,60 @@
+{
+  "objectType": "deals",
+  "group": { "name": "metering_automation", "label": "Metering Automation" },
+  "properties": [
+    {
+      "name": "metering_retailer",
+      "label": "Metering Retailer (normalised)",
+      "type": "enumeration",
+      "fieldType": "select",
+      "description": "Canonical retailer key written by n8n from electricity__retailer.",
+      "options": [
+        ["origin", "Origin"], ["agl", "AGL"], ["energyaustralia", "EnergyAustralia"],
+        ["red_energy", "Red Energy"], ["powershop", "Powershop"], ["engie", "ENGIE"],
+        ["alinta", "Alinta Energy"], ["globird", "GloBird"], ["amber", "Amber"],
+        ["first_energy", "1st Energy (Energy Locals)"], ["momentum", "Momentum Energy"],
+        ["discover", "Discover Energy"], ["nectr", "Nectr"], ["ampol", "Ampol Energy"],
+        ["blue_nrg", "Blue NRG"], ["diamond", "Diamond Energy"], ["kogan", "Kogan Energy"],
+        ["ovo", "OVO Energy"], ["invalid", "Invalid / unknown"], ["blank", "Blank"]
+      ]
+    },
+    {
+      "name": "metering_route",
+      "label": "Metering Route",
+      "type": "enumeration",
+      "fieldType": "select",
+      "options": [
+        ["email_auto", "Email (automatic)"], ["portal_manual", "Portal (manual)"],
+        ["phone_manual", "Phone (manual)"], ["unknown", "Unknown"]
+      ]
+    },
+    { "name": "network_approval_reference", "label": "Network Approval Reference", "type": "string", "fieldType": "text",
+      "description": "Ausgrid job/CNL no., Endeavour PTC no., Essential CSO no." },
+    { "name": "network_approval_letter_url", "label": "Network Approval Letter (file URL)", "type": "string", "fieldType": "text",
+      "description": "HubSpot Files URL of the network approval letter PDF." },
+    { "name": "ccew_pdf_url", "label": "CCEW PDF (file URL)", "type": "string", "fieldType": "text" },
+    { "name": "metering_application_date", "label": "Metering Application Date", "type": "date", "fieldType": "date" },
+    { "name": "metering_application_ref", "label": "Metering Application Reference", "type": "string", "fieldType": "text",
+      "description": "Retailer ticket/job number, if they reply with one." },
+    { "name": "metering_last_chased", "label": "Metering Last Chased", "type": "date", "fieldType": "date" },
+    { "name": "metering_completed_date", "label": "Metering Completed Date", "type": "date", "fieldType": "date" },
+    {
+      "name": "property_ownership",
+      "label": "Property Ownership",
+      "type": "enumeration",
+      "fieldType": "select",
+      "options": [
+        ["Owner-occupier", "Owner-occupier"], ["Tenant", "Tenant"],
+        ["Landlord / investment", "Landlord / investment"]
+      ]
+    },
+    { "name": "account_holder_name", "label": "Electricity Account Holder (if not primary contact)", "type": "string", "fieldType": "text" },
+    { "name": "metering_automation_log", "label": "Metering Automation Log", "type": "string", "fieldType": "textarea",
+      "description": "Append-only log lines written by the MTR n8n workflows." }
+  ],
+  "meteringStatusNewOptions": [
+    "Awaiting Manual Lodgement",
+    "Awaiting Customer Signature",
+    "Metering Completed"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "metering-applications",
+  "private": true,
+  "description": "n8n automation for solar metering applications (see docs/SPEC.md)",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "phase0:plan": "node scripts/phase0-hubspot-properties.js"
+  }
+}
