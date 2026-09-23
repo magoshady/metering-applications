@@ -361,7 +361,7 @@ Data sources (decided):
 - **Replies** from EA can go to any address; the form uses `ccew@impressivebatteries.com.au`.
 
 Steps:
-1. Fill with `src/fillEaForm.js` (pdf-lib; `buildEaJob` then `fillEaForm`), per `forms/ea-fieldmap.json`. The output is flattened. Ticks: Solar alteration; Residential; off peak per above; phase change No; Solar system New.
+1. Fill via the **Vercel function** `POST /api/ea-form` (this repo, `api/ea-form.js`; header `x-api-key` = `FILLER_API_KEY`; body = job object; returns `application/pdf`, or 400 `{ error }` → hold + alert). It wraps `src/fillEaForm.js` and `forms/ea-fieldmap.json`. The output is flattened. Ticks: Solar alteration; Residential; off peak per above; phase change No; Solar system New.
 2. If `property_ownership` is not Owner-occupier → task "Get landlord permission letter", hold, stop (EA requires the owner's letter for leased premises).
 3. Stamp the signature image into `Signature79` and today's date into `Text78`. Upload the signed form to HubSpot Files (`metering/signed-forms/`) and note it on the deal.
 4. Email EA from Rod's Impressive Batteries' Email:

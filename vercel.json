@@ -1,0 +1,5 @@
+{
+  "functions": {
+    "api/ea-form.js": { "includeFiles": "{forms/ea.pdf,forms/ea-fieldmap.json,config/contractors.json}" }
+  }
+}
