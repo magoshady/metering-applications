@@ -251,11 +251,19 @@ For each PDF:
 
 ### 5.3 Getting the network letter and CCEW onto the deal
 
-- **Network letter**: new workflow `MTR – 05 Network Letter Intake`, running in parallel with the existing **PTC Approval DER workflow** (left untouched). It uses its own Gmail trigger on the same label, with the same attachment/filename logic and Anthropic extraction of NMI and DER job number. It must not remove labels or mark emails read, so the original workflow still sees every email. After extraction:
-  1. Find the deal by `nmi` (HubSpot search, pipeline `978394588`). If 0 or >1 matches → Gmail alert to Rodrigo, stop.
-  2. Upload the PDF to HubSpot Files (folder `metering/network-letters/`, private access), attach it to the deal via a note, write `network_approval_letter_url`.
-  3. Ask the Anthropic node to also extract the **approval reference number** and **distributor** → write `network_approval_reference`; if `electricity_distributor` is blank, fill it.
-  4. Filename patterns: Endeavour contains `_PTC_`. `[CONFIRM]` how Ausgrid CNLs and Essential CSO letters arrive (same inbox/label? filename pattern?). Add IF branches for them.
+- **Network letter** (decided): new workflow `MTR – 05 Network Letter Intake`, running in parallel with the three existing distributor PTC workflows (left untouched). Only these three Gmail labels carry approval letters:
+
+  | Distributor | Gmail label ID | Skip emails whose subject contains | Which PDF |
+  |---|---|---|---|
+  | Endeavour | `Label_5823373004158048354` | `Thank you for your Application Submission` | attachment whose filename contains `_PTC_` (case-insensitive) |
+  | Ausgrid | `Label_3303489167417198909` | `Thank you for your Application Submission` | first attachment (`attachment_0`) |
+  | Essential | `Label_592177598515650554` | `Essential Energy Connection Application Approved` (as the existing workflow does) | first attachment (`attachment_0`) |
+
+  Gmail triggers poll every minute, download attachments, and never change labels or read state. **No backfill**: new emails only.
+  1. Claude (Anthropic node) reads the chosen PDF → `{ nmi, reference, distributor, isApprovalLetter }`. If `isApprovalLetter` is false → stop quietly.
+  2. Find the deal: search pipeline `978394588` by the first 10 characters of the NMI (the 11th is a checksum). 0 or >1 matches → alert to Rodrigo, stop.
+  3. Upload the PDF to HubSpot Files (`metering/network-letters/`, private), attach it to the deal via a note, write `network_approval_letter_url` and `network_approval_reference`; fill `electricity_distributor` if blank.
+  4. If the deal is on hold only for a missing network letter, re-run `MTR – 01` for that deal.
 - **CCEW PDF**: `[CONFIRM]` source. Options: (a) the ccew-form app writes it to HubSpot → read `ccew_pdf_url`; (b) it's in Google Drive → search by NMI; (c) from GreenDeal. Do not build this until confirmed.
 
 ---
