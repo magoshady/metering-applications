@@ -49,6 +49,7 @@ function buildAglJob(job, fieldmap, contractor, today = new Date()) {
   const s = job.site;
   const out = {
     ...job,
+    networkApproval: { ...job.networkApproval, text: job.networkApproval?.text || `${job.distributor} network approval ${job.networkApproval?.reference || 'attached'}` },
     contractor,
     applicant: {
       firstName: contractor.signatory.firstName,

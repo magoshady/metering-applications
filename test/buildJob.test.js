@@ -128,3 +128,11 @@ test('hold task lists every reason', () => {
   assert.match(t.subject, /^Metering blocked/);
   assert.match(t.body, /No contact on the deal/);
 });
+
+test('missing network approval reference does not block; text says the letter is attached', () => {
+  const d = deal(); d.properties.der_register_number = null;
+  const r = run(d);
+  assert.strictEqual(r.action, 'email', r.reasons.join());
+  assert.strictEqual(r.job.networkApproval.text, 'Ausgrid network approval attached');
+  assert.strictEqual(run().job.networkApproval.text, 'Ausgrid network approval 220610-2210468');
+});

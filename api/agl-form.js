@@ -9,7 +9,7 @@ const { impressive } = require('../config/contractors.json');
 const template = fs.readFileSync(path.join(__dirname, '..', 'forms', 'agl.pdf'));
 
 module.exports = formEndpoint({
-  required: ['nmi', 'dedicatedControlledLoad', 'distributor', 'networkApproval.reference',
+  required: ['nmi', 'dedicatedControlledLoad', 'distributor',
     'site.streetNumber', 'site.streetName', 'site.suburb', 'site.postcode',
     'accountHolder.firstName', 'accountHolder.lastName', 'accountHolder.mobile', 'accountHolder.email'],
   fill: (job) => fillAglForm(template, fieldmap, buildAglJob(job, fieldmap, impressive), impressive.signatory),

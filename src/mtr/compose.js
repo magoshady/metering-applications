@@ -66,7 +66,7 @@ function composeTask(kind, job, retailer, reasons, settings) {
     `Site: ${job.site.fullAddress}`,
     `NMI: ${job.nmi}`,
     `Retailer: ${job.retailerLabel}`,
-    `Distributor: ${job.distributor}  |  approval ref: ${job.networkApproval.reference || '—'}`,
+    `Distributor: ${job.distributor}  |  approval ref: ${job.networkApproval.reference || '— (letter attached)'}`,
     `Installed: ${job.install.dateDisplay || '—'} (${job.install.type || '—'}, ${job.kw || '—'} kW)`,
     `CCEW: ${job.ccew.receipt || '—'}  |  Controlled load: ${job.dedicatedControlledLoad || '—'}  |  Phases: ${job.phases || '—'}`,
     `Deal: ${job.dealUrl}`,

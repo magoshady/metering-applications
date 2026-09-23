@@ -151,7 +151,7 @@
     "Check Box24, Check Box27, Text55": "5. Commercial / phases yes and its specify box",
     "Text70": "8. Applicant title"
   },
-  "descriptionTemplate": "Account holder {{accountHolder.fullName}}. New {{kw}} kW solar PV installed {{install.dateDisplay}}. CCEW {{ccew.receipt}}. {{distributor}} network approval {{networkApproval.reference}}.",
+  "descriptionTemplate": "Account holder {{accountHolder.fullName}}. New {{kw}} kW solar PV installed {{install.dateDisplay}}. CCEW {{ccew.receipt}}. {{networkApproval.text}}.",
   "_description": "The account holder's name appears nowhere else on the form (Impressive is the applicant), so it leads the description. src/fillEaForm.js word-wraps it over the 3 boxes at the largest font (9 down to 6 pt) that fits, and fails if it can't.",
   "offPeak": {
     "_property": "dedicated_controlled_load",

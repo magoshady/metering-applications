@@ -147,6 +147,7 @@ function buildEaJob(job, fieldmap, contractor, today = new Date()) {
   const todayIso = new Date(today.getTime() + 10 * 3600e3).toISOString(); // AEST date
   return {
     ...job,
+    networkApproval: { ...job.networkApproval, text: job.networkApproval?.text || `${job.distributor} network approval ${job.networkApproval?.reference || 'attached'}` },
     ...offPeak,
     contractor,
     applicant: {

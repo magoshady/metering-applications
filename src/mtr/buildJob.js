@@ -57,6 +57,11 @@ function sydneyDate(value) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date(t));
 }
 
+/** "Ausgrid network approval 78984-2203986", or "... network approval attached" when there's no reference. */
+function approvalText(distributor, reference) {
+  return `${distributor} network approval ${reference ? String(reference).trim() : 'attached'}`.trim();
+}
+
 const ddmmyyyy = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '');
 
 const stripHtml = (s) => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
@@ -158,6 +163,8 @@ function buildJob({ deal, contact, notes, files = [], retailers, hubspotLabels, 
     },
   };
 
+  job.networkApproval.text = approvalText(job.distributor, job.networkApproval.reference);
+
   const dealUpdates = {
     metering_retailer: hubspotLabels.retailer[retailerKey],
     metering_route: hubspotLabels.route[retailer.route] || hubspotLabels.route.unknown,
@@ -209,7 +216,6 @@ function buildJob({ deal, contact, notes, files = [], retailers, hubspotLabels, 
         ? `No ${job.distributor} network approval letter attached (file name matching "${rule.fileName}")`
         : `No rule yet for finding the ${job.distributor || 'distributor'} network approval letter; attach it as a note starting "Network approval"`);
     }
-    if (!job.networkApproval.reference) reasons.push('Network approval reference (or DER register number) is empty');
   }
   if (retailer.form) {
     if (!['Yes - Add', 'Yes - Remove', 'No'].includes(job.dedicatedControlledLoad)) reasons.push('Dedicated Controlled Load is empty');
@@ -225,5 +231,5 @@ function buildJob({ deal, contact, notes, files = [], retailers, hubspotLabels, 
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { buildJob, parseStreet, auMobile, sydneyDate, findNoteAttachment, findLetterFile };
+  module.exports = { buildJob, parseStreet, auMobile, sydneyDate, findNoteAttachment, findLetterFile, approvalText };
 }
