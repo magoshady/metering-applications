@@ -1,0 +1,174 @@
+{
+  "name": "MTR – 01 Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "label:\"Metering 2.0\"",
+          "readStatus": "both"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7bd9e974-137d-4330-aa52-a93476eb0f66",
+      "name": "Gmail: Metering 2.0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bBoYFD6eHvB5ixtS",
+          "name": "Rod's Impressive Batteries' Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const item of $input.all().slice(0, 10)) {\n  const j = item.json;\n  const subject = j.subject || j.Subject || j.headers?.subject || '';\n  const m = String(subject).match(/\\b(\\d{6,})\\b/);\n  out.push({ json: { messageId: j.id, subject, dealId: m ? m[1] : null } });\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "9e76767b-275e-4ee7-a986-f49bd500aee9",
+      "name": "Deal ID From Subject"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has",
+              "leftValue": "={{ $json.dealId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "4bb9316a-7a87-43c8-adb8-5f890c2ae6d6",
+      "name": "Has Deal ID?"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "rSAHfKBbqnACv8uK",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        -100
+      ],
+      "id": "b25e038b-c917-45d9-ad3c-dae19fe78d66",
+      "name": "Process Deal"
+    },
+    {
+      "parameters": {
+        "jsCode": "throw new Error('Trigger email has no deal ID in the subject: \"' + $input.first().json.subject + '\"');"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        100
+      ],
+      "id": "a8c885ed-2137-49e2-a837-0210f95cbabb",
+      "name": "No Deal ID"
+    }
+  ],
+  "connections": {
+    "Gmail: Metering 2.0": {
+      "main": [
+        [
+          {
+            "node": "Deal ID From Subject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deal ID From Subject": {
+      "main": [
+        [
+          {
+            "node": "Has Deal ID?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Deal ID?": {
+      "main": [
+        [
+          {
+            "node": "Process Deal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Deal ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "CS7g4VWEMmGhn3DQ",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

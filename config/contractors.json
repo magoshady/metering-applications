@@ -1,20 +1,20 @@
 {
-  "Impressive,": {
-    "business": "[CONFIRM]",
-    "abn": "[CONFIRM]",
-    "recLicence": "[CONFIRM]",
-    "aspNumber": "[CONFIRM]",
-    "contactName": "[CONFIRM]",
+  "impressive": {
+    "business": "IMPRESSIVE ELECTRICAL & SOLAR PTY LTD",
+    "abn": "51616534751",
+    "acn": "616534751",
+    "email": "ccew@impressivebatteries.com.au",
     "phone": "1300 797 630",
-    "email": "[CONFIRM]"
+    "contactName": "Sam Husband",
+    "mobile": "1300 797 630",
+    "recLicence": "279684C",
+    "signatory": {
+      "firstName": "Rodrigo",
+      "lastName": "Candi",
+      "mobile": "0498 976 345",
+      "signatureSvgPath": "M 4 22 C 6 14 8 6 10 2 C 11 8 11 16 12 26 M 10 3 C 22 -2 26 8 14 13 C 20 16 24 22 30 26 M 52 6 C 46 0 34 4 34 16 C 34 26 46 28 54 20 M 56 22 C 66 12 74 20 84 14 C 92 10 98 18 108 12"
+    },
+    "hubspotOwnerId": "360340383"
   },
-  "Energy Flow": {
-    "business": "[CONFIRM]",
-    "abn": "[CONFIRM]",
-    "recLicence": "[CONFIRM]",
-    "aspNumber": "[CONFIRM]",
-    "contactName": "[CONFIRM]",
-    "phone": "[CONFIRM]",
-    "email": "[CONFIRM]"
-  }
+  "_adminOwner": "Manual tasks are owned by Rodrigo Candi (HubSpot owner 360340383)."
 }

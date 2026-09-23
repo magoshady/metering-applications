@@ -1,0 +1,12 @@
+{
+  "dealId": "123",
+  "nmi": "4103123456",
+  "distributor": "Ausgrid",
+  "kw": "6.6",
+  "dedicatedControlledLoad": "Yes - Add",
+  "networkApproval": { "reference": "A12345" },
+  "ccew": { "receipt": "1234567" },
+  "install": { "date": "2026-09-18" },
+  "site": { "lot": "", "unit": "", "streetNumber": "12", "streetName": "Example", "streetType": "St", "suburb": "Miranda", "state": "NSW", "postcode": "2228" },
+  "accountHolder": { "firstName": "Jane", "lastName": "Citizen", "email": "jane@example.com", "mobile": "0411 111 111" }
+}

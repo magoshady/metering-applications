@@ -1,0 +1,267 @@
+{
+  "_source": "AGL 'Consent form – new connection request' AGL1295 (Updated June 2020), supplied by Rodrigo. Not fillable: boxes measured from the PDF's vector rectangles (PDF points, origin bottom-left, page index 0-based). The homeowner signs on our signing page (/sign); their drawn signature, the date and an audit line are stamped in by src/fillAglForm.js signAglConsent.",
+  "text": [
+    {
+      "label": "1. Lot no",
+      "page": 0,
+      "x": 60,
+      "y": 681,
+      "w": 15,
+      "h": 14,
+      "value": "site.lot"
+    },
+    {
+      "label": "1. Unit no",
+      "page": 0,
+      "x": 114,
+      "y": 681,
+      "w": 15,
+      "h": 14,
+      "value": "site.unit"
+    },
+    {
+      "label": "1. Street no",
+      "page": 0,
+      "x": 172,
+      "y": 681,
+      "w": 15,
+      "h": 14,
+      "value": "site.streetNumber"
+    },
+    {
+      "label": "1. Street name",
+      "page": 0,
+      "x": 241,
+      "y": 681,
+      "w": 321,
+      "h": 14,
+      "value": "site.streetLine"
+    },
+    {
+      "label": "1. Suburb",
+      "page": 0,
+      "x": 64,
+      "y": 656,
+      "w": 211,
+      "h": 14,
+      "value": "site.suburb"
+    },
+    {
+      "label": "1. State",
+      "page": 0,
+      "x": 311,
+      "y": 656,
+      "w": 107,
+      "h": 14,
+      "value": "site.state"
+    },
+    {
+      "label": "1. Postcode",
+      "page": 0,
+      "x": 466,
+      "y": 656,
+      "w": 96,
+      "h": 14,
+      "value": "site.postcode"
+    },
+    {
+      "label": "2. Organiser first name",
+      "page": 0,
+      "x": 74,
+      "y": 582,
+      "w": 117,
+      "h": 14,
+      "value": "applicant.firstName"
+    },
+    {
+      "label": "2. Organiser surname",
+      "page": 0,
+      "x": 235,
+      "y": 582,
+      "w": 117,
+      "h": 14,
+      "value": "applicant.lastName"
+    },
+    {
+      "label": "2. Company name",
+      "page": 0,
+      "x": 92,
+      "y": 562,
+      "w": 261,
+      "h": 14,
+      "value": "contractor.business"
+    },
+    {
+      "label": "2. ABN",
+      "page": 0,
+      "x": 382,
+      "y": 562,
+      "w": 180,
+      "h": 14,
+      "value": "contractor.abn"
+    },
+    {
+      "label": "2. Phone",
+      "page": 0,
+      "x": 82,
+      "y": 542,
+      "w": 121,
+      "h": 14,
+      "value": "applicant.mobile"
+    },
+    {
+      "label": "2. Email",
+      "page": 0,
+      "x": 235,
+      "y": 542,
+      "w": 327,
+      "h": 14,
+      "value": "contractor.email",
+      "keepCase": true
+    },
+    {
+      "label": "3. Homeowner first name",
+      "page": 0,
+      "x": 74,
+      "y": 483,
+      "w": 137,
+      "h": 14,
+      "value": "accountHolder.firstName"
+    },
+    {
+      "label": "3. Homeowner surname",
+      "page": 0,
+      "x": 253,
+      "y": 483,
+      "w": 180,
+      "h": 14,
+      "value": "accountHolder.lastName"
+    },
+    {
+      "label": "3. Current address",
+      "page": 0,
+      "x": 92,
+      "y": 463,
+      "w": 471,
+      "h": 14,
+      "value": "site.fullStreet"
+    },
+    {
+      "label": "3. Suburb",
+      "page": 0,
+      "x": 64,
+      "y": 443,
+      "w": 158,
+      "h": 14,
+      "value": "site.suburb"
+    },
+    {
+      "label": "3. State",
+      "page": 0,
+      "x": 253,
+      "y": 443,
+      "w": 191,
+      "h": 14,
+      "value": "site.state"
+    },
+    {
+      "label": "3. Postcode",
+      "page": 0,
+      "x": 490,
+      "y": 443,
+      "w": 73,
+      "h": 14,
+      "value": "site.postcode"
+    },
+    {
+      "label": "3. Mobile",
+      "page": 0,
+      "x": 416,
+      "y": 423,
+      "w": 147,
+      "h": 14,
+      "value": "accountHolder.mobile"
+    },
+    {
+      "label": "3. Email",
+      "page": 0,
+      "x": 59,
+      "y": 403,
+      "w": 504,
+      "h": 14,
+      "value": "accountHolder.email",
+      "keepCase": true
+    }
+  ],
+  "checkbox": [
+    {
+      "label": "1. Supply fuel type: Electricity",
+      "page": 0,
+      "x": 92,
+      "y": 636,
+      "size": 14,
+      "value": "=true"
+    },
+    {
+      "label": "3. Bills by email",
+      "page": 0,
+      "x": 33,
+      "y": 368,
+      "size": 11,
+      "value": "=true"
+    },
+    {
+      "label": "4. Model standing offer (NSW & SA)",
+      "page": 1,
+      "x": 33,
+      "y": 318,
+      "size": 11,
+      "value": "=true"
+    }
+  ],
+  "leaveBlank": [
+    "1. Gas",
+    "2. Licence number (organiser is Rodrigo, not the electrician)",
+    "3. Date of birth, home phone, work phone, paper bills",
+    "4. Marketing opt-in ticks (the homeowner's choice)"
+  ],
+  "homeownerSignature": {
+    "signature": {
+      "page": 1,
+      "x": 112,
+      "y": 237,
+      "w": 282,
+      "h": 17,
+      "role": "Homeowner"
+    },
+    "date": {
+      "page": 1,
+      "x": 447,
+      "y": 237,
+      "w": 73,
+      "h": 17,
+      "role": "Homeowner"
+    },
+    "acceptTick": {
+      "page": 1,
+      "x": 33,
+      "y": 264,
+      "size": 11,
+      "label": "5. Your acceptance (ticked when the homeowner signs)"
+    },
+    "dateParts": {
+      "page": 1,
+      "y": 237,
+      "h": 17,
+      "day": 452,
+      "month": 475,
+      "year": 497
+    }
+  },
+  "auditLine": {
+    "page": 1,
+    "x": 33,
+    "y": 224,
+    "size": 6.5
+  }
+}

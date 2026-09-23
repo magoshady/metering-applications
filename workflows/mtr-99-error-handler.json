@@ -1,0 +1,81 @@
+{
+  "name": "MTR – 99 Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b5f0a4a2-9e0f-4c0e-9a1a-990000000001",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst exec = d.execution || {};\nconst wf = d.workflow || {};\nconst err = exec.error || {};\nconst esc = (s) => String(s ?? '').replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));\n\nconst message = err.message || (err.messages && err.messages[0]) || 'No message';\nconst node = (err.node && err.node.name) || exec.lastNodeExecuted || 'Unknown node';\nconst m = String(message).match(/\\bdeal\\s*(?:id)?\\s*[:#]?\\s*(\\d{6,})/i);\nconst dealId = m ? m[1] : null;\nconst dealUrl = dealId ? 'https://app-ap1.hubspot.com/contacts/441838848/record/0-3/' + dealId : null;\nconst execUrl = exec.url || null;\n\nconst row = (k, v) => '<tr><td style=\"padding:4px 12px 4px 0;color:#555;vertical-align:top\">' + k + '</td><td style=\"padding:4px 0\">' + v + '</td></tr>';\nconst html = '<div style=\"font-family:Arial,sans-serif;font-size:14px\">'\n  + '<p><b>' + esc(wf.name || 'Unknown workflow') + '</b> failed.</p>'\n  + '<table style=\"border-collapse:collapse\">'\n  + row('Deal', dealUrl ? '<a href=\"' + dealUrl + '\">' + dealId + '</a>' : 'not known')\n  + row('Node', esc(node))\n  + row('Error', esc(message))\n  + (err.description ? row('Details', esc(err.description)) : '')\n  + row('Execution', execUrl ? '<a href=\"' + esc(execUrl) + '\">' + esc(exec.id) + '</a>' : esc(exec.id || 'n/a'))\n  + row('Mode', esc(exec.mode || ''))\n  + '</table></div>';\n\nreturn [{ json: {\n  subject: 'MTR error: ' + (wf.name || 'workflow') + (dealId ? ' (deal ' + dealId + ')' : ''),\n  html,\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "b5f0a4a2-9e0f-4c0e-9a1a-990000000002",
+      "name": "Build Alert"
+    },
+    {
+      "parameters": {
+        "sendTo": "rodrigo@impressivebatteries.com.au",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        440,
+        0
+      ],
+      "id": "b5f0a4a2-9e0f-4c0e-9a1a-990000000003",
+      "name": "Email Rodrigo",
+      "webhookId": "b5f0a4a2-9e0f-4c0e-9a1a-990000000004",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bBoYFD6eHvB5ixtS",
+          "name": "Rod's Impressive Batteries' Email"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alert": {
+      "main": [
+        [
+          {
+            "node": "Email Rodrigo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

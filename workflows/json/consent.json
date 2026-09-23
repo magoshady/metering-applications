@@ -1,0 +1,261 @@
+{
+  "name": "MTR – 30 Consent Signed",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mtr-consent-signed",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a77086cd-e1f4-41a4-a4f8-ac89e21ab139",
+      "name": "Signing Page Webhook",
+      "webhookId": "mtr-consent-signed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://metering-applications.vercel.app/api/sign-finalize",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "37c25e41-d496-4942-a245-02ec8bcab17c",
+      "name": "Signed PDF (Vercel)",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4t99N3DNPPhFiej0",
+          "name": "EA Filler"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        0
+      ],
+      "id": "eb3adb28-0ddb-497a-a177-80e9d1413ca0",
+      "name": "Reply To Page"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "FjT3zT91PYYQGYCc",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "e7be3c53-5fac-4711-ae7b-cb8597807db5",
+      "name": "Get Settings"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { dealId: String($('Signed PDF (Vercel)').first().json.dealId) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "id": "e26b5152-248a-49ab-a901-e1f8957a8c2c",
+      "name": "Deal ID"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "6b91NqzIvCJTc1ez",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "1b057c29-5636-4da0-a488-93e6d7e44cc0",
+      "name": "Build Job"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst f = $('Signed PDF (Vercel)').first().json;\nconst b = $('Signing Page Webhook').first().json.body;\nconst settings = $('Get Settings').first().json;\nconst status = r.deal.properties.metering_status;\nif (!settings.dryRun && status !== 'Awaiting Customer Signature') throw new Error('deal ' + f.dealId + ': consent signed but Metering Status is \"' + status + '\", not Awaiting Customer Signature; not sending');\nreturn [{ json: { ...r, settings, phase: 'send', signedConsentPdf: f.pdf, consentAudit: { name: b.typedName, email: f.signerEmail, signedAt: b.signedAt, ip: b.ip } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "id": "8cadca4e-b66b-4f2c-a7af-2a0ff494ac5b",
+      "name": "Prepare Send"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "qX1JwgbW9ALdP7cp",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1680,
+        0
+      ],
+      "id": "eaf4eac1-643e-444c-afbd-979d1ad93567",
+      "name": "Send Application"
+    }
+  ],
+  "connections": {
+    "Signing Page Webhook": {
+      "main": [
+        [
+          {
+            "node": "Signed PDF (Vercel)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signed PDF (Vercel)": {
+      "main": [
+        [
+          {
+            "node": "Reply To Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply To Page": {
+      "main": [
+        [
+          {
+            "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Settings": {
+      "main": [
+        [
+          {
+            "node": "Deal ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deal ID": {
+      "main": [
+        [
+          {
+            "node": "Build Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Job": {
+      "main": [
+        [
+          {
+            "node": "Prepare Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Send": {
+      "main": [
+        [
+          {
+            "node": "Send Application",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "CS7g4VWEMmGhn3DQ",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

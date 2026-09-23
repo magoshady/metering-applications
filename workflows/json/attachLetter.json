@@ -1,0 +1,520 @@
+{
+  "name": "MTR – 06 Attach Letter",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "5d01f216-db98-43f7-a813-7f6f5bbb0248",
+      "name": "When Called"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'nmi', operator: 'CONTAINS_TOKEN', value: $json.nmi10 + '*' }, { propertyName: 'pipeline', operator: 'EQ', value: '978394588' }] }], properties: ['dealname', 'nmi', 'network_approval_reference', 'electricity_distributor', 'metering_status', 'metering_automation_log'], limit: 5 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "69bd369f-af7d-421c-ae82-1aa0a941d5e2",
+      "name": "Find Deal By NMI",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\n$input.all().forEach((item) => {\n  const src = $('When Called').first();\n  const hits = (item.json.results || []).filter((d) => String(d.properties.nmi || '').toUpperCase().replace(/\\s/g, '').startsWith(src.json.nmi10));\n  if (hits.length !== 1) throw new Error('Network letter NMI ' + src.json.nmi + ' (' + src.json.distributor + ', ref ' + src.json.reference + ', file ' + src.json.fileName + ') matched ' + hits.length + ' deals in the pipeline; attach it by hand');\n  out.push({ json: { ...src.json, dealId: String(hits[0].id), deal: hits[0].properties }, binary: src.binary });\n});\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "id": "b5fab37e-6fe6-401e-a08e-471acf3c5348",
+      "name": "Exactly One Deal"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/notes/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'associations.deal', operator: 'EQ', value: $json.dealId }] }], properties: ['hs_attachment_ids'], limit: 100 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        0
+      ],
+      "id": "0072adef-b5ac-487b-a035-c68d0152b0ca",
+      "name": "Deal Notes",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = $('Exactly One Deal').first();\nconst out = [];\nfor (const n of $input.first().json.results || []) for (const f of String(n.properties.hs_attachment_ids || '').split(';').filter(Boolean)) out.push({ json: { fileId: f } });\nreturn out.length ? out.slice(0, 80) : [{ json: { fileId: 'none' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        0
+      ],
+      "id": "735154b5-891d-4320-ab13-ab9baf17c233",
+      "name": "Attached File IDs",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.hubapi.com/files/v3/files/' + $json.fileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        0
+      ],
+      "id": "b3183775-6293-4062-a72e-df3cc7ec3df6",
+      "name": "Attached File Names",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = $('Exactly One Deal').first();\nconst norm = (s) => String(s || '').toLowerCase().replace(/\\.pdf$/, '').replace(/[^a-z0-9]+/g, ' ').trim();\nconst want = norm(src.json.fileName);\nconst have = $input.all().map((f) => norm((f.json.name || '') + (f.json.extension ? '.' + f.json.extension : '')));\nconst duplicate = have.includes(want);\n// testOnly (test harness): report and stop before any write.\nif (src.json.testOnly) return [{ json: { testOnly: true, duplicate, dealId: src.json.dealId, checked: have.length } }];\nif (duplicate) return [];\nreturn [src];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        0
+      ],
+      "id": "14bf0207-72e1-405f-a390-34500af0912d",
+      "name": "Already Attached?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "t",
+              "leftValue": "={{ $json.testOnly }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2520,
+        160
+      ],
+      "id": "f4ff54f8-cc29-42ad-ac65-1da12d1dc8cf",
+      "name": "Test Only?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/files/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "letter"
+            },
+            {
+              "name": "folderPath",
+              "value": "/metering/network-letters"
+            },
+            {
+              "name": "fileName",
+              "value": "={{ $json.fileName }}"
+            },
+            {
+              "name": "options",
+              "value": "{\"access\":\"PRIVATE\",\"overwrite\":false,\"duplicateValidationStrategy\":\"NONE\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        0
+      ],
+      "id": "159daeeb-ab5b-4ab0-abe9-b8600fe1d2b5",
+      "name": "Upload Letter",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/notes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: { hs_timestamp: new Date().toISOString(), hs_note_body: 'Network approval ' + $('Already Attached?').first().json.reference + ' (' + $('Already Attached?').first().json.distributor + ') attached via n8n', hs_attachment_ids: String($json.id) }, associations: [{ to: { id: $('Already Attached?').first().json.dealId }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2880,
+        0
+      ],
+      "id": "084df17b-6dd0-48ef-a569-af5fe6b22a0d",
+      "name": "Note On Deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction appendLog(old, line) {\n  const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' }).format(new Date());\n  const lines = String(old || '').split('\\n').filter(Boolean);\n  lines.push(stamp + ' ' + line);\n  return lines.slice(-30).join('\\n');\n}\nconst s = $('Already Attached?').first().json;\nconst f = $('Upload Letter').first().json;\nconst properties = {\n  network_approval_reference: s.reference || s.deal.network_approval_reference || '',\n  network_approval_letter_url: f.url || '',\n};\nif (!s.deal.electricity_distributor && ['Ausgrid', 'Endeavour', 'Essential'].includes(s.distributor)) properties.electricity_distributor = s.distributor;\n// Re-run the deal if it is on hold and every reason in the last HOLD line was about the network letter.\nconst lastHold = String(s.deal.metering_automation_log || '').split('\\n').reverse().find((l) => / HOLD: /.test(l)) || '';\nconst reasons = lastHold.split(' HOLD: ')[1]?.split('; ') || [];\nconst onlyLetter = reasons.length > 0 && reasons.every((r) => /network approval/i.test(r));\nconst retry = s.deal.metering_status === 'Metering Issues Not Sent On Hold' && onlyLetter;\nif (retry) properties.metering_status = '';\nproperties.metering_automation_log = appendLog(s.deal.metering_automation_log, 'Network approval ' + s.reference + ' attached (' + s.fileName + ')' + (retry ? '; hold cleared, re-running' : ''));\nreturn [{ json: { dealId: s.dealId, properties, retry } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        0
+      ],
+      "id": "d72c3f87-7c99-47a0-a8ea-b629254d68fa",
+      "name": "Deal Updates"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.hubapi.com/crm/v3/objects/deals/' + $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: $json.properties }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3360,
+        0
+      ],
+      "id": "7e12971e-28bc-48ae-a5d8-0106c2aa5bbe",
+      "name": "Update Deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "r",
+              "leftValue": "={{ $('Deal Updates').first().json.retry }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3600,
+        0
+      ],
+      "id": "79bc2c41-a53e-418b-a1eb-23e17f1a9590",
+      "name": "Retry?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { dealId: $('Deal Updates').first().json.dealId, messageId: '' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        0
+      ],
+      "id": "14aa83e9-99b1-4a5a-a69b-434d57070015",
+      "name": "Re-run Deal"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "rSAHfKBbqnACv8uK",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        4080,
+        0
+      ],
+      "id": "701269b0-51fe-40d0-adf4-2ae814c8cc85",
+      "name": "Process Deal"
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Find Deal By NMI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Deal By NMI": {
+      "main": [
+        [
+          {
+            "node": "Exactly One Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exactly One Deal": {
+      "main": [
+        [
+          {
+            "node": "Deal Notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deal Notes": {
+      "main": [
+        [
+          {
+            "node": "Attached File IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attached File IDs": {
+      "main": [
+        [
+          {
+            "node": "Attached File Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attached File Names": {
+      "main": [
+        [
+          {
+            "node": "Already Attached?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Attached?": {
+      "main": [
+        [
+          {
+            "node": "Test Only?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Only?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Upload Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Letter": {
+      "main": [
+        [
+          {
+            "node": "Note On Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Note On Deal": {
+      "main": [
+        [
+          {
+            "node": "Deal Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deal Updates": {
+      "main": [
+        [
+          {
+            "node": "Update Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Deal": {
+      "main": [
+        [
+          {
+            "node": "Retry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry?": {
+      "main": [
+        [
+          {
+            "node": "Re-run Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-run Deal": {
+      "main": [
+        [
+          {
+            "node": "Process Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "CS7g4VWEMmGhn3DQ",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

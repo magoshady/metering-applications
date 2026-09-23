@@ -1,0 +1,888 @@
+{
+  "name": "MTR – 10 Send Application",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8aa42e85-15e8-47ef-a176-ae1ca20117fe",
+      "name": "When Called"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.hubapi.com/crm/v3/objects/deals/' + $json.job.dealId + '?properties=metering_application_date,metering_status,metering_automation_log' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "9d4ec75d-a16d-431d-ad94-2a074bfaa593",
+      "name": "Re-read Deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $('When Called').first().json;\nconst now = $input.first().json.properties;\nif (now.metering_application_date && !i.settings.dryRun) throw new Error('deal ' + i.job.dealId + ': already has a Metering Application Date; not sending again');\nreturn [{ json: { ...i, needsSignature: !!i.retailer.needsCustomerSignature && i.phase !== 'send' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "ce5c11c0-eef9-432d-af1a-85a7fafc17fb",
+      "name": "Guard"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "sig",
+              "leftValue": "={{ $json.needsSignature }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "5086a275-4af4-4d68-a01e-240ffd29a8c7",
+      "name": "Needs Signature First?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.settings.fillerUrl }}/api/sign-link",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ...$json.job, signerEmail: $json.settings.dryRun ? $json.settings.testInbox : $json.job.accountHolder.email }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        -240
+      ],
+      "id": "4ca8c56a-1e68-410e-a983-46408bbcb2e1",
+      "name": "Get Signing Link (Vercel)",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4t99N3DNPPhFiej0",
+          "name": "EA Filler"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $('Guard').first().json;\nconst l = $input.first().json;\nconst s = i.settings;\nconst h = i.job.accountHolder;\nconst expires = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(l.expiresAt));\nconst to = s.dryRun ? s.testInbox : h.email;\nconst subject = (s.dryRun ? '[DRY RUN → ' + h.email + '] ' : '') + 'Please sign your AGL solar meter consent – ' + i.job.site.fullAddress;\nconst esc = (x) => String(x).replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));\nconst p = (x) => '<p style=\"margin:0 0 14px\">' + x + '</p>';\nconst body = '<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1b2230;max-width:560px\">'\n  + (s.dryRun ? '<p style=\"margin:0 0 14px;padding:8px 10px;background:#fff4d6;border-radius:6px;font-size:13px\">DRY RUN: in live mode this goes to ' + esc(h.email) + '.</p>' : '')\n  + p('Hi ' + esc(h.firstName) + ',')\n  + p('To get your meter set up for your new solar at <strong>' + esc(i.job.site.fullAddress) + '</strong>, AGL needs your consent for us to lodge the request on your behalf.')\n  + p('It takes about a minute: check your details and sign.')\n  + '<p style=\"margin:22px 0\"><a href=\"' + esc(l.url) + '\" style=\"background:#0b5cad;color:#ffffff;text-decoration:none;font-weight:bold;padding:13px 26px;border-radius:8px;display:inline-block\">Review and sign</a></p>'\n  + p('<span style=\"color:#5d6675;font-size:13px\">This link is just for you and works until ' + esc(expires) + '.</span>')\n  + p('If you have any questions, call us on 1300 797 630.')\n  + p('Kind regards,<br>Impressive Team<br><span style=\"color:#5d6675\">IMPRESSIVE ELECTRICAL &amp; SOLAR PTY LTD | 1300 797 630</span>')\n  + '</div>';\nreturn [{ json: { ...i, invite: { to, subject, body, expiresAt: l.expiresAt } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -240
+      ],
+      "id": "c898985e-1b46-4a72-a7ed-8ed4480c3efb",
+      "name": "Compose Invite"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.invite.to }}",
+        "subject": "={{ $json.invite.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.invite.body }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Impressive Team"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        -240
+      ],
+      "id": "662d7e19-1d20-47f7-a29f-68df8ad1c502",
+      "name": "Email Homeowner",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bBoYFD6eHvB5ixtS",
+          "name": "Rod's Impressive Batteries' Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction appendLog(old, line) {\n  const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' }).format(new Date());\n  const lines = String(old || '').split('\\n').filter(Boolean);\n  lines.push(stamp + ' ' + line);\n  return lines.slice(-30).join('\\n');\n}\nconst i = $('Compose Invite').first().json;\nconst m = $input.first().json;\nconst line = (i.settings.dryRun ? '[DRY RUN] ' : '') + 'AGL consent link emailed to ' + i.invite.to + ' (expires ' + i.invite.expiresAt.slice(0, 10) + ') msgId=' + m.id;\nconst properties = { metering_automation_log: appendLog(i.deal.properties.metering_automation_log, line) };\nif (!i.settings.dryRun) Object.assign(properties, i.dealUpdates, { metering_status: 'Awaiting Customer Signature' });\nreturn [{ json: { dealId: i.job.dealId, properties } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        -240
+      ],
+      "id": "8332a097-c77a-47a9-a783-58f8e9a9c7f8",
+      "name": "Awaiting Signature Updates"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.hubapi.com/crm/v3/objects/deals/' + $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: $json.properties }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        -240
+      ],
+      "id": "b3cfb27d-7ca7-4280-a6fd-e0daed2519ed",
+      "name": "Update Deal (awaiting signature)",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $('Guard').first().json;\nconst r = i.retailer;\nconst files = [];\nfor (const a of r.attachments) {\n  if (a === 'ea_form' || a === 'agl_form') files.push({ kind: 'filler', form: r.form + '-form', name: a === 'ea_form' ? 'EA Service Works Request.pdf' : 'AGL Application for Electricity.pdf', upload: true });\n  else if (a === 'ccew') files.push({ kind: 'hubspot', fileId: i.job.ccew.fileId, name: 'CCEW ' + i.job.ccew.receipt + '.pdf' });\n  else if (a === 'network_letter') files.push({ kind: 'hubspot', fileId: i.job.networkApproval.fileId, name: i.job.distributor + ' network approval.pdf' });\n  else if (a === 'agl_consent_signed') {\n    if (!i.signedConsentPdf) throw new Error('deal ' + i.job.dealId + ': AGL needs the signed consent form but none was passed in');\n    files.push({ kind: 'inline', name: 'AGL consent form (signed).pdf', upload: true });\n  }\n}\nreturn files.map((f, n) => ({ json: { ...f, n, job: i.job, fillerUrl: i.settings.fillerUrl } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        120
+      ],
+      "id": "adf6dd5c-26ad-4487-a899-fdac4c791adb",
+      "name": "Plan"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "filler",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "filler"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "hubspot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "hubspot"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "inline",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "inline"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1200,
+        120
+      ],
+      "id": "62a1e376-b57a-4279-a5c5-a423a435d7d6",
+      "name": "By Source"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.fillerUrl }}/api/{{ $json.form }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.job) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        -40
+      ],
+      "id": "198dff50-6d68-4207-adf4-383318800aec",
+      "name": "Fill Form (Vercel)",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4t99N3DNPPhFiej0",
+          "name": "EA Filler"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.hubapi.com/files/v3/files/' + $json.fileId + '/signed-url' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        120
+      ],
+      "id": "b922fca0-83cf-4387-a2c8-05654f6f1ac7",
+      "name": "HubSpot Signed URL",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        120
+      ],
+      "id": "e3b8a7b8-53f5-482d-a584-edb36ed2b543",
+      "name": "Download HubSpot File",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $('Guard').first().json;\nreturn [{ json: {}, binary: { data: await this.helpers.prepareBinaryData(Buffer.from(i.signedConsentPdf, 'base64'), 'AGL consent form (signed).pdf', 'application/pdf') } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        280
+      ],
+      "id": "c31d3d9f-e333-484c-a205-c6a82ae5653d",
+      "name": "Signed Consent File"
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $('Guard').first().json;\nconst e = $input.first().json;\nthrow new Error('deal ' + i.job.dealId + ': could not get an attachment: ' + (e.error?.message || JSON.stringify(e.error || e).slice(0, 300)));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        360
+      ],
+      "id": "4328ff52-a2da-4285-aebd-aebfe2866e0d",
+      "name": "File Failed"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1920,
+        120
+      ],
+      "id": "6c031f5a-8fae-4e34-ab4d-e8b1e8ee9f86",
+      "name": "Wait For All Files"
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $('Guard').first().json;\nconst planned = $('Plan').all().map((p) => p.json);\nconst got = $input.all();\nif (got.length !== planned.length) throw new Error('deal ' + i.job.dealId + ': expected ' + planned.length + ' attachments, got ' + got.length);\nconst binary = {};\nconst files = [];\ngot.forEach((item, idx) => {\n  const p = $('Plan').itemMatching(idx).json;\n  if (!item.binary || !item.binary.data) throw new Error('deal ' + i.job.dealId + ': ' + p.name + ' came back empty');\n  const key = 'att' + p.n;\n  binary[key] = { ...item.binary.data, fileName: p.name, mimeType: 'application/pdf' };\n  files.push({ key, name: p.name, upload: !!p.upload });\n});\nfiles.sort((a, b) => a.key.localeCompare(b.key));\nreturn [{ json: { ...i, files }, binary }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        120
+      ],
+      "id": "a5774bd4-ac7c-452a-a2ab-b32f967f6969",
+      "name": "Collect Files"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compose the retailer email and the HubSpot task text for a job.\n// Pure functions, inlined into n8n Code nodes by workflows/build.js.\n\nconst ATTACHMENT_NAMES = {\n  ea_form: 'EnergyAustralia Service Works Request (signed)',\n  agl_form: 'AGL Application for Electricity (signed)',\n  agl_consent_signed: 'AGL consent form (signed by the homeowner)',\n  ccew: 'CCEW',\n  network_letter: 'Network approval letter',\n};\n\nfunction fill(template, data) {\n  return String(template).replace(/\\{\\{\\s*([\\w.]+)\\s*\\}\\}/g, (_, path) => {\n    const v = path.split('.').reduce((o, k) => (o == null ? o : o[k]), data);\n    return v == null ? '' : String(v);\n  });\n}\n\n/**\n * @param {object} job from buildJob\n * @param {object} retailer config/retailers.json entry\n * @param {object} templates config/email-templates.json\n * @param {object} settings { dryRun, testInbox }\n * @returns {{ to: string, cc: string, subject: string, body: string, realTo: string }}\n */\nfunction composeEmail(job, retailer, templates, settings) {\n  const data = {\n    ...job,\n    street: [job.site.unit && `${job.site.unit}/`, job.site.streetNumber, ' ', job.site.streetName, job.site.streetType && ` ${job.site.streetType}`]\n      .join('').replace('/ ', '/').trim(),\n    suburb: job.site.suburb,\n    attachmentList: (retailer.attachments || []).map((a) => `- ${ATTACHMENT_NAMES[a] || a}`).join('\\n'),\n  };\n  const realTo = (retailer.to || []).join(',');\n  let subject = fill(retailer.subjectTemplate, data);\n  let body = `${fill(templates[job.retailerKey], data)}\\n\\n${templates.signature}`;\n  let to = realTo;\n  let cc = (retailer.cc || []).join(',');\n  if (settings.dryRun) {\n    subject = `[DRY RUN → ${realTo}] ${subject}`;\n    body = `DRY RUN: in live mode this goes to ${realTo}${cc ? ` (cc ${cc})` : ''}.\\n\\n${body}`;\n    to = settings.testInbox;\n    cc = '';\n  }\n  return { to, cc, subject, body, realTo };\n}\n\n/**\n * HubSpot task for a manual route or a hold.\n * @param {'manual'|'hold'} kind\n */\nfunction composeTask(kind, job, retailer, reasons, settings) {\n  const lines = [];\n  if (kind === 'hold') {\n    lines.push('The metering automation stopped for this deal. Fix the items below, then clear Metering Status and re-send the trigger email:');\n    for (const r of reasons) lines.push(`• ${r}`);\n    lines.push('');\n  } else {\n    const how = retailer.route === 'portal_manual' ? `Portal / web form: ${retailer.portalUrl}` : `Phone: ${retailer.phone || 'unknown: look up'}`;\n    lines.push(`Lodge the solar meter request with ${retailer.label} manually. ${how}`);\n    if (reasons.length) { lines.push('Also note:'); for (const r of reasons) lines.push(`• ${r}`); }\n    lines.push('');\n  }\n  lines.push(\n    `Customer: ${job.accountHolder.fullName}  |  ${job.accountHolder.mobile}  |  ${job.accountHolder.email}`,\n    `Site: ${job.site.fullAddress}`,\n    `NMI: ${job.nmi}`,\n    `Retailer: ${job.retailerLabel}`,\n    `Distributor: ${job.distributor}  |  approval ref: ${job.networkApproval.reference || '— (letter attached)'}`,\n    `Installed: ${job.install.dateDisplay || '—'} (${job.install.type || '—'}, ${job.kw || '—'} kW)`,\n    `CCEW: ${job.ccew.receipt || '—'}  |  Controlled load: ${job.dedicatedControlledLoad || '—'}  |  Phases: ${job.phases || '—'}`,\n    `Deal: ${job.dealUrl}`,\n    '',\n    kind === 'manual' ? 'When lodged: set Metering Status to \"Metering Application Sent\" and the Metering Application Date.' : '',\n  );\n  const subject = kind === 'hold'\n    ? `Metering blocked – ${job.dealName || job.dealId}`\n    : `Lodge metering – ${retailer.label} – NMI ${job.nmi}`;\n  return { subject: settings.dryRun ? `[DRY RUN] ${subject}` : subject, body: lines.join('\\n').trim() };\n}\n\n\nconst templates = {\"_about\":\"Plain-text email bodies for MTR – 10 Send Application, keyed by retailer. {{…}} are job-object paths; {{attachmentList}} is one '- name' line per attachment. Sent from Rod's Impressive Batteries' Email, signed Impressive Team.\",\"signature\":\"Kind regards,\\nImpressive Team\\nIMPRESSIVE ELECTRICAL & SOLAR PTY LTD | 1300 797 630\",\"energyaustralia\":\"Hi EnergyAustralia Solar Connections team,\\n\\nPlease find attached a solar meter alteration request for your customer:\\n\\nCustomer: {{accountHolder.fullName}}\\nSite: {{site.fullAddress}}\\nNMI: {{nmi}}\\nNetwork approval: {{networkApproval.text}}\\nSolar installed: {{install.dateDisplay}}\\nCCEW: {{ccew.receipt}}\\n\\nAttached:\\n{{attachmentList}}\\n\\nPlease let us know if you need anything else.\",\"agl\":\"Hi AGL New Connections team,\\n\\nPlease find attached a solar meter alteration request for your customer:\\n\\nCustomer: {{accountHolder.fullName}}\\nSite: {{site.fullAddress}}\\nNMI: {{nmi}}\\nNetwork approval: {{networkApproval.text}}\\nSolar installed: {{install.dateDisplay}}\\nCCEW: {{ccew.receipt}}\\n\\nAttached:\\n{{attachmentList}}\\n\\nPlease let us know if you need anything else.\",\"globird\":\"Hi GloBird team,\\n\\nWe have installed solar for your customer at {{site.fullAddress}} (NMI {{nmi}}). Please find the attached {{distributor}} network approval so the meter can be configured for solar.\\n\\nAttached:\\n{{attachmentList}}\\n\\nPlease let us know if you need anything else.\",\"amber\":\"Hi Amber team,\\n\\nWe have installed solar for your customer at {{site.fullAddress}} (NMI {{nmi}}) on {{install.dateDisplay}}. Please find the compliance certificate and network approval attached so the meter can be configured for solar.\\n\\nAttached:\\n{{attachmentList}}\\n\\nPlease let us know if you need anything else.\",\"red_energy\":\"Hi Red Energy team,\\n\\nWe have installed solar at {{site.fullAddress}}, NMI {{nmi}}.\\n\\nPlease find attached the CCEW and the network approval.\\n\\nAttached:\\n{{attachmentList}}\"};\nconst item = $input.first();\nconst i = item.json;\nconst email = composeEmail(i.job, i.retailer, templates, i.settings);\nreturn [{ json: { ...i, email, attachmentKeys: i.files.map((f) => f.key).join(',') }, binary: item.binary }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        120
+      ],
+      "id": "31d32e23-9566-43de-aa13-e3f003757542",
+      "name": "Compose Email"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email.to }}",
+        "subject": "={{ $json.email.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.email.body }}",
+        "options": {
+          "appendAttribution": false,
+          "ccList": "={{ $json.email.cc }}",
+          "senderName": "Impressive Team",
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "={{ $json.attachmentKeys }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2640,
+        120
+      ],
+      "id": "d7a3f08e-a374-46ce-ad6b-857b30ba5659",
+      "name": "Send Email",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bBoYFD6eHvB5ixtS",
+          "name": "Rod's Impressive Batteries' Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction appendLog(old, line) {\n  const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' }).format(new Date());\n  const lines = String(old || '').split('\\n').filter(Boolean);\n  lines.push(stamp + ' ' + line);\n  return lines.slice(-30).join('\\n');\n}\nconst i = $('Compose Email').first().json;\nconst m = $input.first().json;\nconst s = i.settings;\nconst today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());\nlet line = (s.dryRun ? '[DRY RUN] ' : '') + 'SENT ' + i.retailer.label + ' to ' + i.email.realTo + ' msgId=' + m.id + ' threadId=' + m.threadId;\nif (i.consentAudit) line = (s.dryRun ? '[DRY RUN] ' : '') + 'Consent signed by ' + i.consentAudit.name + ' at ' + i.consentAudit.signedAt + ' IP ' + i.consentAudit.ip + '\\n' + line;\nconst properties = { metering_automation_log: appendLog(i.deal.properties.metering_automation_log, line) };\nif (!s.dryRun) Object.assign(properties, i.dealUpdates, { metering_status: 'Metering Application Sent', metering_application_date: today, dealstage: s.stageAfterSend });\nconst uploads = s.dryRun ? [] : i.files.filter((f) => f.upload);\nreturn [{ json: { dealId: i.job.dealId, properties, uploads, noteBody: 'Metering application emailed to ' + i.retailer.label + ' (' + i.email.realTo + '): ' + i.email.subject } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        120
+      ],
+      "id": "048e8fb0-b496-4d24-aab5-d00d6fd29945",
+      "name": "After Send"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.hubapi.com/crm/v3/objects/deals/' + $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: $json.properties }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        120
+      ],
+      "id": "0ccb6452-583b-48e4-ae17-c504dab19acf",
+      "name": "Update Deal (sent)",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const a = $('After Send').first().json;\nconst c = $('Compose Email').first();\nif (!a.uploads.length) return [];\nreturn a.uploads.map((u) => ({ json: { dealId: a.dealId, name: u.name }, binary: { data: c.binary[u.key] } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        120
+      ],
+      "id": "5161044e-3ee7-4c2d-a1f2-bb364a579468",
+      "name": "Files To Upload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/files/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "folderPath",
+              "value": "/metering/sent-forms"
+            },
+            {
+              "name": "fileName",
+              "value": "={{ $json.dealId }} {{ $json.name }}"
+            },
+            {
+              "name": "options",
+              "value": "{\"access\":\"PRIVATE\",\"overwrite\":false}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3600,
+        120
+      ],
+      "id": "d3c6fbf6-66ab-4910-adf3-5edac9a921ff",
+      "name": "Upload To HubSpot",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/notes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: { hs_timestamp: new Date().toISOString(), hs_note_body: $('After Send').first().json.noteBody, hs_attachment_ids: $input.all().map((x) => x.json.id).join(';') }, associations: [{ to: { id: $('After Send').first().json.dealId }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3840,
+        120
+      ],
+      "id": "b7bc70d5-da59-47b4-adcf-ce18f9b3fff0",
+      "name": "Note On Deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      },
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Re-read Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-read Deal": {
+      "main": [
+        [
+          {
+            "node": "Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard": {
+      "main": [
+        [
+          {
+            "node": "Needs Signature First?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Signature First?": {
+      "main": [
+        [
+          {
+            "node": "Get Signing Link (Vercel)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Signing Link (Vercel)": {
+      "main": [
+        [
+          {
+            "node": "Compose Invite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Invite": {
+      "main": [
+        [
+          {
+            "node": "Email Homeowner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Homeowner": {
+      "main": [
+        [
+          {
+            "node": "Awaiting Signature Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Awaiting Signature Updates": {
+      "main": [
+        [
+          {
+            "node": "Update Deal (awaiting signature)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan": {
+      "main": [
+        [
+          {
+            "node": "By Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "By Source": {
+      "main": [
+        [
+          {
+            "node": "Fill Form (Vercel)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HubSpot Signed URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Signed Consent File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot Signed URL": {
+      "main": [
+        [
+          {
+            "node": "Download HubSpot File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "File Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fill Form (Vercel)": {
+      "main": [
+        [
+          {
+            "node": "Wait For All Files",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "File Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download HubSpot File": {
+      "main": [
+        [
+          {
+            "node": "Wait For All Files",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "File Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signed Consent File": {
+      "main": [
+        [
+          {
+            "node": "Wait For All Files",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Wait For All Files": {
+      "main": [
+        [
+          {
+            "node": "Collect Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Files": {
+      "main": [
+        [
+          {
+            "node": "Compose Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "After Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "After Send": {
+      "main": [
+        [
+          {
+            "node": "Update Deal (sent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Deal (sent)": {
+      "main": [
+        [
+          {
+            "node": "Files To Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Files To Upload": {
+      "main": [
+        [
+          {
+            "node": "Upload To HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload To HubSpot": {
+      "main": [
+        [
+          {
+            "node": "Note On Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "CS7g4VWEMmGhn3DQ",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

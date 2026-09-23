@@ -1,0 +1,15 @@
+{
+  "_about": "How MTR – 03 finds the network approval letter among a deal's HubSpot attachments (file names, case-insensitive regex). Newest match wins. A note starting 'Network approval' (written by MTR – 05) is also accepted.",
+  "Ausgrid": {
+    "fileName": "^Notification Letter",
+    "_note": "Confirmed by Rodrigo 23 Sep 2026: the Notification Letter is the approval retailers need."
+  },
+  "Endeavour": {
+    "fileName": "_PTC_",
+    "_note": "Same rule as the Endeavour PTC workflow"
+  },
+  "Essential": {
+    "fileName": null,
+    "_note": "Rare. No file name rule yet: Essential deals hold until the letter is attached as a note starting \"Network approval\"."
+  }
+}

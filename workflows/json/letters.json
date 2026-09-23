@@ -1,0 +1,338 @@
+{
+  "name": "MTR – 05 Network Letter Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "Label_5823373004158048354"
+          ],
+          "readStatus": "both"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -200
+      ],
+      "id": "a585f965-45b3-4a9b-a3d1-0cc8f504cd63",
+      "name": "Gmail: Endeavour letters",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bBoYFD6eHvB5ixtS",
+          "name": "Rod's Impressive Batteries' Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = {\"name\":\"Endeavour\",\"label\":\"Label_5823373004158048354\",\"skip\":\"Thank you for your Application Submission\"};\nconst rule = ({\"_about\":\"How MTR – 03 finds the network approval letter among a deal's HubSpot attachments (file names, case-insensitive regex). Newest match wins. A note starting 'Network approval' (written by MTR – 05) is also accepted.\",\"Ausgrid\":{\"fileName\":\"^Notification Letter\",\"_note\":\"Confirmed by Rodrigo 23 Sep 2026: the Notification Letter is the approval retailers need.\"},\"Endeavour\":{\"fileName\":\"_PTC_\",\"_note\":\"Same rule as the Endeavour PTC workflow\"},\"Essential\":{\"fileName\":null,\"_note\":\"Rare. No file name rule yet: Essential deals hold until the letter is attached as a note starting \\\"Network approval\\\".\"}})[d.name] || {};\nconst re = rule.fileName ? new RegExp(rule.fileName, 'i') : null;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const subject = j.subject || j.headers?.subject || '';\n  if (d.skip && subject.includes(d.skip)) continue;\n  const bin = item.binary || {};\n  const pdfs = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));\n  // With a file-name rule, only the matching PDF is the approval; otherwise the first PDF.\n  const key = re ? pdfs.find((k) => re.test(bin[k].fileName || '')) : pdfs[0];\n  if (!key) continue;\n  out.push({ json: { distributor: d.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -200
+      ],
+      "id": "36e292ab-11db-4630-a875-fd37f60e3754",
+      "name": "Pick PDF (Endeavour)"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "Label_3303489167417198909"
+          ],
+          "readStatus": "both"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4116502f-18f6-4f04-a8d9-149fd3a8d271",
+      "name": "Gmail: Ausgrid letters",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bBoYFD6eHvB5ixtS",
+          "name": "Rod's Impressive Batteries' Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = {\"name\":\"Ausgrid\",\"label\":\"Label_3303489167417198909\",\"skip\":\"Thank you for your Application Submission\"};\nconst rule = ({\"_about\":\"How MTR – 03 finds the network approval letter among a deal's HubSpot attachments (file names, case-insensitive regex). Newest match wins. A note starting 'Network approval' (written by MTR – 05) is also accepted.\",\"Ausgrid\":{\"fileName\":\"^Notification Letter\",\"_note\":\"Confirmed by Rodrigo 23 Sep 2026: the Notification Letter is the approval retailers need.\"},\"Endeavour\":{\"fileName\":\"_PTC_\",\"_note\":\"Same rule as the Endeavour PTC workflow\"},\"Essential\":{\"fileName\":null,\"_note\":\"Rare. No file name rule yet: Essential deals hold until the letter is attached as a note starting \\\"Network approval\\\".\"}})[d.name] || {};\nconst re = rule.fileName ? new RegExp(rule.fileName, 'i') : null;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const subject = j.subject || j.headers?.subject || '';\n  if (d.skip && subject.includes(d.skip)) continue;\n  const bin = item.binary || {};\n  const pdfs = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));\n  // With a file-name rule, only the matching PDF is the approval; otherwise the first PDF.\n  const key = re ? pdfs.find((k) => re.test(bin[k].fileName || '')) : pdfs[0];\n  if (!key) continue;\n  out.push({ json: { distributor: d.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "f04d10c9-c07a-4a79-ae49-22c1f9b1817e",
+      "name": "Pick PDF (Ausgrid)"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "Label_592177598515650554"
+          ],
+          "readStatus": "both"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "id": "61c2acdd-0a55-4dd1-a937-896802c1f964",
+      "name": "Gmail: Essential letters",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bBoYFD6eHvB5ixtS",
+          "name": "Rod's Impressive Batteries' Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = {\"name\":\"Essential\",\"label\":\"Label_592177598515650554\",\"skip\":\"Essential Energy Connection Application Approved\"};\nconst rule = ({\"_about\":\"How MTR – 03 finds the network approval letter among a deal's HubSpot attachments (file names, case-insensitive regex). Newest match wins. A note starting 'Network approval' (written by MTR – 05) is also accepted.\",\"Ausgrid\":{\"fileName\":\"^Notification Letter\",\"_note\":\"Confirmed by Rodrigo 23 Sep 2026: the Notification Letter is the approval retailers need.\"},\"Endeavour\":{\"fileName\":\"_PTC_\",\"_note\":\"Same rule as the Endeavour PTC workflow\"},\"Essential\":{\"fileName\":null,\"_note\":\"Rare. No file name rule yet: Essential deals hold until the letter is attached as a note starting \\\"Network approval\\\".\"}})[d.name] || {};\nconst re = rule.fileName ? new RegExp(rule.fileName, 'i') : null;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const subject = j.subject || j.headers?.subject || '';\n  if (d.skip && subject.includes(d.skip)) continue;\n  const bin = item.binary || {};\n  const pdfs = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));\n  // With a file-name rule, only the matching PDF is the approval; otherwise the first PDF.\n  const key = re ? pdfs.find((k) => re.test(bin[k].fileName || '')) : pdfs[0];\n  if (!key) continue;\n  out.push({ json: { distributor: d.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        200
+      ],
+      "id": "4b1e4870-00eb-4f7f-aa30-15b820cc467f",
+      "name": "Pick PDF (Essential)"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        480,
+        0
+      ],
+      "id": "77e229ec-52e6-479f-a979-8a4b3102b3f9",
+      "name": "Letters"
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-5-20250929"
+        },
+        "text": "This PDF should be an NSW electricity distributor approval for a solar/battery connection (Ausgrid Notification Letter, Endeavour PTC / connection of generator, Essential connection approval). Reply with JSON only, no prose: {\"isApprovalLetter\": true|false, \"nmi\": \"<NMI exactly as printed>\", \"reference\": \"<the distributor's approval / job / reference number>\", \"distributor\": \"Ausgrid\"|\"Endeavour\"|\"Essential\"}",
+        "inputType": "binary",
+        "binaryPropertyName": "letter",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        720,
+        0
+      ],
+      "id": "bb4ce4c5-b6b5-4368-abd7-e09f241c0a5e",
+      "name": "Read Letter (Claude)",
+      "credentials": {
+        "anthropicApi": {
+          "id": "Y5pXWsYFFWYhRrox",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\n$input.all().forEach((item, i) => {\n  const src = $('Letters').itemMatching(i);\n  const raw = item.json.content?.[0]?.text || item.json.text || '';\n  let p;\n  try { p = JSON.parse(String(raw).replace(/^```json\\s*/, '').replace(/\\s*```$/, '').trim()); } catch (e) { throw new Error('Network letter \"' + src.json.fileName + '\": could not read Claude reply: ' + raw.slice(0, 200)); }\n  if (!p.isApprovalLetter) return;\n  const nmi = String(p.nmi || '').replace(/\\s/g, '').toUpperCase();\n  if (!/^[A-Z0-9]{10,11}$/.test(nmi)) throw new Error('Network letter \"' + src.json.fileName + '\": NMI \"' + p.nmi + '\" not valid');\n  out.push({ json: { ...src.json, nmi, nmi10: nmi.slice(0, 10), reference: String(p.reference || '').trim() }, binary: src.binary });\n});\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "id": "b19be22e-87b1-479f-a8d3-2007bf9eda33",
+      "name": "Parse Letter"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "0i8xK26d8BFXg3Gf",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "670e0463-b783-4285-a6fa-9e1972818f23",
+      "name": "Attach Letter (each)"
+    }
+  ],
+  "connections": {
+    "Gmail: Endeavour letters": {
+      "main": [
+        [
+          {
+            "node": "Pick PDF (Endeavour)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail: Ausgrid letters": {
+      "main": [
+        [
+          {
+            "node": "Pick PDF (Ausgrid)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail: Essential letters": {
+      "main": [
+        [
+          {
+            "node": "Pick PDF (Essential)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick PDF (Endeavour)": {
+      "main": [
+        [
+          {
+            "node": "Letters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick PDF (Ausgrid)": {
+      "main": [
+        [
+          {
+            "node": "Letters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick PDF (Essential)": {
+      "main": [
+        [
+          {
+            "node": "Letters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Letters": {
+      "main": [
+        [
+          {
+            "node": "Read Letter (Claude)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Letter (Claude)": {
+      "main": [
+        [
+          {
+            "node": "Parse Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Letter": {
+      "main": [
+        [
+          {
+            "node": "Attach Letter (each)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "CS7g4VWEMmGhn3DQ",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "name": "MTR – 20 Manual Task",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2e4cac08-d381-41c0-aab6-057c6edef876",
+      "name": "When Called"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compose the retailer email and the HubSpot task text for a job.\n// Pure functions, inlined into n8n Code nodes by workflows/build.js.\n\nconst ATTACHMENT_NAMES = {\n  ea_form: 'EnergyAustralia Service Works Request (signed)',\n  agl_form: 'AGL Application for Electricity (signed)',\n  agl_consent_signed: 'AGL consent form (signed by the homeowner)',\n  ccew: 'CCEW',\n  network_letter: 'Network approval letter',\n};\n\nfunction fill(template, data) {\n  return String(template).replace(/\\{\\{\\s*([\\w.]+)\\s*\\}\\}/g, (_, path) => {\n    const v = path.split('.').reduce((o, k) => (o == null ? o : o[k]), data);\n    return v == null ? '' : String(v);\n  });\n}\n\n/**\n * @param {object} job from buildJob\n * @param {object} retailer config/retailers.json entry\n * @param {object} templates config/email-templates.json\n * @param {object} settings { dryRun, testInbox }\n * @returns {{ to: string, cc: string, subject: string, body: string, realTo: string }}\n */\nfunction composeEmail(job, retailer, templates, settings) {\n  const data = {\n    ...job,\n    street: [job.site.unit && `${job.site.unit}/`, job.site.streetNumber, ' ', job.site.streetName, job.site.streetType && ` ${job.site.streetType}`]\n      .join('').replace('/ ', '/').trim(),\n    suburb: job.site.suburb,\n    attachmentList: (retailer.attachments || []).map((a) => `- ${ATTACHMENT_NAMES[a] || a}`).join('\\n'),\n  };\n  const realTo = (retailer.to || []).join(',');\n  let subject = fill(retailer.subjectTemplate, data);\n  let body = `${fill(templates[job.retailerKey], data)}\\n\\n${templates.signature}`;\n  let to = realTo;\n  let cc = (retailer.cc || []).join(',');\n  if (settings.dryRun) {\n    subject = `[DRY RUN → ${realTo}] ${subject}`;\n    body = `DRY RUN: in live mode this goes to ${realTo}${cc ? ` (cc ${cc})` : ''}.\\n\\n${body}`;\n    to = settings.testInbox;\n    cc = '';\n  }\n  return { to, cc, subject, body, realTo };\n}\n\n/**\n * HubSpot task for a manual route or a hold.\n * @param {'manual'|'hold'} kind\n */\nfunction composeTask(kind, job, retailer, reasons, settings) {\n  const lines = [];\n  if (kind === 'hold') {\n    lines.push('The metering automation stopped for this deal. Fix the items below, then clear Metering Status and re-send the trigger email:');\n    for (const r of reasons) lines.push(`• ${r}`);\n    lines.push('');\n  } else {\n    const how = retailer.route === 'portal_manual' ? `Portal / web form: ${retailer.portalUrl}` : `Phone: ${retailer.phone || 'unknown: look up'}`;\n    lines.push(`Lodge the solar meter request with ${retailer.label} manually. ${how}`);\n    if (reasons.length) { lines.push('Also note:'); for (const r of reasons) lines.push(`• ${r}`); }\n    lines.push('');\n  }\n  lines.push(\n    `Customer: ${job.accountHolder.fullName}  |  ${job.accountHolder.mobile}  |  ${job.accountHolder.email}`,\n    `Site: ${job.site.fullAddress}`,\n    `NMI: ${job.nmi}`,\n    `Retailer: ${job.retailerLabel}`,\n    `Distributor: ${job.distributor}  |  approval ref: ${job.networkApproval.reference || '— (letter attached)'}`,\n    `Installed: ${job.install.dateDisplay || '—'} (${job.install.type || '—'}, ${job.kw || '—'} kW)`,\n    `CCEW: ${job.ccew.receipt || '—'}  |  Controlled load: ${job.dedicatedControlledLoad || '—'}  |  Phases: ${job.phases || '—'}`,\n    `Deal: ${job.dealUrl}`,\n    '',\n    kind === 'manual' ? 'When lodged: set Metering Status to \"Metering Application Sent\" and the Metering Application Date.' : '',\n  );\n  const subject = kind === 'hold'\n    ? `Metering blocked – ${job.dealName || job.dealId}`\n    : `Lodge metering – ${retailer.label} – NMI ${job.nmi}`;\n  return { subject: settings.dryRun ? `[DRY RUN] ${subject}` : subject, body: lines.join('\\n').trim() };\n}\n\n\n\nfunction appendLog(old, line) {\n  const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' }).format(new Date());\n  const lines = String(old || '').split('\\n').filter(Boolean);\n  lines.push(stamp + ' ' + line);\n  return lines.slice(-30).join('\\n');\n}\nconst i = $input.first().json;\nconst s = i.settings;\nconst task = composeTask(i.kind, i.job, i.retailer, i.reasons, s);\nconst status = i.kind === 'hold' ? 'Metering Issues Not Sent On Hold' : 'Awaiting Manual Lodgement';\nconst logLine = (s.dryRun ? '[DRY RUN] ' : '') + (i.kind === 'hold' ? 'HOLD: ' + i.reasons.join('; ') : 'Manual task: ' + i.retailer.label);\nconst properties = { metering_automation_log: appendLog(i.deal.properties.metering_automation_log, logLine) };\nif (!s.dryRun) Object.assign(properties, i.dealUpdates, { metering_status: status });\nreturn [{ json: { ...i, task, properties } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "b4629d35-4c76-4505-abd6-709c3b41212e",
+      "name": "Compose Task"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dry",
+              "leftValue": "={{ $json.settings.dryRun }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "b4b263d0-6dcf-40eb-a793-f8488712b283",
+      "name": "Dry Run?"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.settings.testInbox }}",
+        "subject": "={{ $json.task.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.task.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        720,
+        -120
+      ],
+      "id": "ba149d9c-d396-421d-a622-7f0f526921d8",
+      "name": "Email Task (dry run)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bBoYFD6eHvB5ixtS",
+          "name": "Rod's Impressive Batteries' Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/tasks",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: { hs_task_subject: $json.task.subject, hs_task_body: $json.task.body, hubspot_owner_id: $json.settings.taskOwnerId, hs_task_status: 'NOT_STARTED', hs_task_priority: $json.kind === 'hold' ? 'HIGH' : 'MEDIUM', hs_task_type: 'TODO', hs_timestamp: new Date(Date.now() + 864e5).toISOString() }, associations: [{ to: { id: $json.job.dealId }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 216 }] }] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        120
+      ],
+      "id": "1cc359d2-c529-4f47-a6a1-0af8589ddbbe",
+      "name": "Create HubSpot Task",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.hubapi.com/crm/v3/objects/deals/' + $('Compose Task').first().json.job.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: $('Compose Task').first().json.properties }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "bae9b4e1-55b8-4bf9-af86-f1f46a25f915",
+      "name": "Update Deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Compose Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Task": {
+      "main": [
+        [
+          {
+            "node": "Dry Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dry Run?": {
+      "main": [
+        [
+          {
+            "node": "Email Task (dry run)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create HubSpot Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Task (dry run)": {
+      "main": [
+        [
+          {
+            "node": "Update Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create HubSpot Task": {
+      "main": [
+        [
+          {
+            "node": "Update Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "CS7g4VWEMmGhn3DQ",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}
