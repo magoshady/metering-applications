@@ -1,0 +1,54 @@
+{
+  "_source": "EnergyAustralia 'Service Works request for electricity' (service_works_request_form_2024.pdf), fillable AcroForm, 3 pages A4. Field names are generic (Text35, Check Box3…), mapped here by position against the printed labels.",
+  "_expressions": "Values are paths into the job object (§6.2 of SPEC.md) or literals prefixed with '='. Checkboxes: true = ticked.",
+  "text": {
+    "Text35": { "label": "2. Description of works (line 1)", "value": "descriptionLine1" },
+    "Text36": { "label": "2. Description of works (line 2)", "value": "descriptionLine2" },
+    "Text37": { "label": "2. Description of works (line 3)", "value": "descriptionLine3" },
+    "Text38": { "label": "3. Lot no", "value": "site.lot" },
+    "Text39": { "label": "3. Unit no", "value": "site.unit" },
+    "Text40": { "label": "3. Street no", "value": "site.streetNumber" },
+    "Text41": { "label": "3. Street name", "value": "site.streetName" },
+    "Text42": { "label": "3. Street type", "value": "site.streetType" },
+    "Text43": { "label": "3. Suburb", "value": "site.suburb" },
+    "Text44": { "label": "3. State", "value": "site.state" },
+    "Text45": { "label": "3. Postcode", "value": "site.postcode" },
+    "Text47": { "label": "3. NMI or meter number (alterations and solar)", "value": "nmi" },
+    "Text56": { "label": "5. Solar system install date", "value": "install.dateDisplay" },
+    "Text57": { "label": "6. Electrician full name", "value": "contractor.contactName" },
+    "Text58": { "label": "6. Electrician mobile", "value": "contractor.mobile" },
+    "Text59": { "label": "6. Business name", "value": "contractor.business" },
+    "Text60": { "label": "6. Landline", "value": "contractor.phone" },
+    "Text61": { "label": "6. Electrical licence no", "value": "contractor.recLicence" },
+    "Text62": { "label": "6. Email", "value": "contractor.email" },
+    "Text71": { "label": "8. Applicant first name", "value": "accountHolder.firstName" },
+    "Text72": { "label": "8. Applicant last name", "value": "accountHolder.lastName" },
+    "Text73": { "label": "8. Applicant mobile", "value": "accountHolder.mobile" },
+    "Text75": { "label": "8. Applicant email", "value": "accountHolder.email" }
+  },
+  "checkbox": {
+    "Check Box3":  { "label": "1. Solar alteration (add solar channel into meter)", "value": "=true" },
+    "Check Box23": { "label": "5. Premise type: Residential", "value": "=true" },
+    "Check Box26": { "label": "5. Adding or removing off peak? No", "value": "=true" },
+    "Check Box28": { "label": "5. Upgrading/downgrading phases? No", "value": "=true" },
+    "Check Box29": { "label": "5. Solar system: New", "value": "=true" }
+  },
+  "leaveBlank": {
+    "Check Box1-2": "1. New connection / Alteration",
+    "Text46, Text48, Text49": "3. NMI (Ausgrid new connections), DP number, REX ID (SAPN)",
+    "Check Box4-20, Text50-51": "4. Connection details (new connections only)",
+    "Check Box21-22, Text52": "4. cont. conjunction works (new connections only)",
+    "Check Box24-25, Check Box27, Text53, Text55": "5. Commercial / off-peak yes / phases yes and their specify boxes",
+    "Check Box30-31": "5. Solar system Replacement / Upgrade",
+    "Check Box32-34, Text63-69": "7. Level 2 electrician details (NSW new connections/alterations only) [CONFIRM not needed for solar]",
+    "Text70, Text74, Text76, Text77": "8. Applicant title, landline, business name, ABN",
+    "Text78, Signature79": "9. Date and signature: placed by DocuSeal, never filled by us"
+  },
+  "docuseal": {
+    "_units": "DocuSeal areas are fractions of the page, origin top-left. Page index 0-based.",
+    "signature": { "page": 2, "x": 0.0655, "y": 0.830, "w": 0.3612, "h": 0.0368, "role": "Account Holder" },
+    "date":      { "page": 2, "x": 0.4469, "y": 0.8406, "w": 0.2117, "h": 0.0261, "role": "Account Holder" }
+  },
+  "descriptionTemplate": "New {{kw}} kW solar PV installed {{install.dateDisplay}}. Please add solar channel / reconfigure or exchange meter as required. CCEW {{ccew.receipt}}. {{distributor}} approval {{networkApproval.reference}}.",
+  "_description": "Wrap descriptionTemplate into 3 lines of ~48 characters (each box is ~240pt wide at auto font size)."
+}

@@ -82,7 +82,7 @@ Pipeline **Post Sale To Completion** = `978394588`.
 | Ignore | `1509971396` | Job Cancelled |
 | Upstream (context) | `2114714048` Job Done – PTC Pending · `1509971392` 95% Complete · `3301252579` Pending Sun Cover – Job Done · `1509971391` Battery Installed | |
 
-> Only move the deal from `1879662022` to `1509971393` **after** the application is actually sent (email route) or the manual task is marked complete (portal/phone route). `[CONFIRM]` Rodrigo may prefer the automation never moves stages and only sets `metering_status`.
+> Only move the deal from `1879662022` to `1509971393` **after** the application is actually sent (email route) or the manual task is marked complete (portal/phone route). (Decided: the automation moves the stage.)
 
 ### 3.2 Existing deal properties to READ
 
@@ -343,27 +343,28 @@ roperties to fetch: every READ property in §3.2 plus the new ones.
 }
 ```
 
-**Contractor block** comes from a config keyed by `installer`:
-
-```json
-{
-  "Impressive,":  { "business": "[CONFIRM]", "abn": "[CONFIRM]", "recLicence": "[CONFIRM]", "aspNumber": "[CONFIRM]", "contactName": "[CONFIRM]", "phone": "1300 797 630", "email": "[CONFIRM]" },
-  "Energy Flow":  { "business": "[CONFIRM]", "abn": "[CONFIRM]", "recLicence": "[CONFIRM]", "aspNumber": "[CONFIRM]", "contactName": "[CONFIRM]", "phone": "[CONFIRM]", "email": "[CONFIRM]" }
-}
-```
+**Contractor block** (decided): always Impressive, from `config/contractors.json` (`impressive`). Business name, ABN, ACN, email and phone are filled; electrician name, mobile and licence number are `[CONFIRM]`.
 
 ### 6.3 `MTR – 10 EA Handler` (Phase 1: build this first, fully)
 
-1. Fetch EA form template from `./forms/ea.pdf` (baked into the filler service image).
-2. Fill: service type = **Solar alteration**; description of works = `New solar PV system {{kW}} kW installed {{install.date}}; inverter on {{completionDate}}. Please add solar channel / reconfigure or exchange meter as required. CCEW {{ccew.receipt}}. Network approval {{networkApproval.reference}} ({{distributor}}).`; site; NMI; electrician block from contractor; account holder block. `[CONFIRM]` kW source property (look for a system size property, e.g. `sf_system_size`; if not found, omit).
-3. If `ownership != Owner-occupier` → require a landlord letter: create task "Get landlord permission letter", stop with `Awaiting Customer Signature` / hold.
-4. Send to DocuSeal (§7) for the account holder's signature. Set status `Awaiting Customer Signature` `[CONFIRM option]`.
-5. On DocuSeal completion (`MTR – 30`): email EA:
+Form: `forms/ea.pdf` (EA "Service Works request for electricity", 2024 edition, supplied by Rodrigo). It is a **fillable AcroForm** with generic field names; `forms/ea-fieldmap.json` maps each one to its printed label and to a job-object path. `forms/ea-sample-filled.pdf` is a sample fill with dummy data.
+
+Data sources (decided):
+- **Account holder** = the deal's primary contact (always).
+- **System size** = `sf_system_size_kw_stc`.
+- **CCEW PDF** = file on a HubSpot note on the deal whose attachment name starts with `CCEW ` (e.g. `CCEW 1234567`); receipt number from the `ccew_receipt_number` property. If no note or the numbers differ → hold + alert.
+- **Contractor** = Impressive (above).
+
+Steps:
+1. Fill per the fieldmap. Ticks: Solar alteration; Residential; off-peak change No; phase change No; Solar system New. Description of works (3 lines): `New {{kW}} kW solar PV installed {{install date}}. Please add solar channel / reconfigure or exchange meter as required. CCEW {{receipt}}. {{distributor}} approval {{reference}}.`
+2. If `property_ownership` is not Owner-occupier → task "Get landlord permission letter", hold, stop (EA requires the letter for leased premises).
+3. Send to DocuSeal (§7) for the account holder's signature; signature and date areas are in the fieldmap (`docuseal`). Status `Awaiting Customer Signature`.
+4. On completion (`MTR – 30`) email EA from Rod's Impressive Batteries' Email:
    - To: `solarconnections@energyaustralia.com.au`
    - Subject: `Solar meter alteration – NMI {{nmi}} – {{street}}, {{suburb}}`
-   - Body: §8.1
+   - Body: §8.1, signed **Impressive Team**
    - Attach: signed EA form, CCEW PDF, network letter.
-6. After send: `metering_status = Metering Application Sent`, `metering_application_date = today`, append log with Gmail message ID + thread ID, move stage to `1509971393` `[CONFIRM]`, create ticket "Metering application lodged – EnergyAustralia" associated to deal.
+5. After send: `metering_status = Metering Application Sent`, `metering_application_date = today`, log Gmail message + thread ID, create ticket "Metering application lodged – EnergyAustralia", and **move the deal to stage `1509971393`** ("Install Complete and metering forms submitted for first time PV installations…").
 
 ### 6.4 `MTR – 11 AGL Handler` (Phase 2)
 
@@ -464,7 +465,7 @@ Attached:
 The system is switched off pending meter work. Please let us know if you need anything else.
 
 Kind regards,
-{{sender.name}}
+Impressive Team
 {{contractor.business}} | {{contractor.phone}}
 ```
 
