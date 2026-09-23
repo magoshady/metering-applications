@@ -4,15 +4,15 @@
   "text": {
     "Text35": {
       "label": "2. Description of works (line 1)",
-      "value": "descriptionLine1"
+      "value": "(descriptionTemplate, wrapped)"
     },
     "Text36": {
       "label": "2. Description of works (line 2)",
-      "value": "descriptionLine2"
+      "value": "(descriptionTemplate, wrapped)"
     },
     "Text37": {
       "label": "2. Description of works (line 3)",
-      "value": "descriptionLine3"
+      "value": "(descriptionTemplate, wrapped)"
     },
     "Text38": {
       "label": "3. Lot no",
@@ -151,8 +151,8 @@
     "Check Box24, Check Box27, Text55": "5. Commercial / phases yes and its specify box",
     "Text70": "8. Applicant title"
   },
-  "descriptionTemplate": "Account holder {{accountHolder.fullName}}. New {{kw}} kW solar PV installed {{install.dateDisplay}}. Please add solar channel / reconfigure or exchange meter as required. CCEW {{ccew.receipt}}. {{distributor}} approval {{networkApproval.reference}}.",
-  "_description": "The account holder's name appears nowhere else on the form (Impressive is the applicant), so it leads the description. Wrap into 3 lines of ~48 characters; if it overflows, drop 'Please add solar channel / reconfigure or exchange meter as required.' first.",
+  "descriptionTemplate": "Account holder {{accountHolder.fullName}}. New {{kw}} kW solar PV installed {{install.dateDisplay}}. CCEW {{ccew.receipt}}. {{distributor}} network approval {{networkApproval.reference}}.",
+  "_description": "The account holder's name appears nowhere else on the form (Impressive is the applicant), so it leads the description. src/fillEaForm.js word-wraps it over the 3 boxes at the largest font (9 down to 6 pt) that fits, and fails if it can't.",
   "offPeak": {
     "_property": "dedicated_controlled_load",
     "Yes - Add": {
@@ -173,7 +173,7 @@
     "(blank)": "hold: task 'Confirm dedicated controlled load (hot water) Add / Remove / No'"
   },
   "signature": {
-    "_how": "Impressive is the applicant and signs. Draw the signatory's signature image into the Signature79 rectangle and set Text78 to today's date. The image is kept in n8n, not in this repo.",
+    "_how": "Impressive is the applicant; Rodrigo Candi signs. Draw config/contractors.json impressive.signatory.signatureSvgPath (an 'RC' scribble, vector, no image file) inside the Signature79 rectangle with pdf-lib drawSvgPath, and set Text78 to today's date.",
     "field": "Signature79",
     "page": 2,
     "rect_pt": {
