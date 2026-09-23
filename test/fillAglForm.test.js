@@ -53,3 +53,18 @@ test('text too long for its box fails loudly', async () => {
     /too long/,
   );
 });
+
+test('consent form: every box on the page, DocuSeal areas are fractions of the page', async () => {
+  const { fillAglConsent } = require('../src/fillAglForm');
+  const { docusealArea } = require('../src/overlayForm');
+  const consentMap = require('../forms/agl-consent-fieldmap.json');
+  const tpl = fs.readFileSync(path.join(__dirname, '../forms/agl-consent.pdf'));
+  const doc = await PDFDocument.load(tpl);
+  for (const f of [...consentMap.text, ...consentMap.checkbox]) assert.ok(doc.getPages()[f.page], f.label);
+  const bytes = await fillAglConsent(tpl, consentMap, buildAglJob(job, fieldmap, impressive, today));
+  assert.strictEqual((await PDFDocument.load(bytes)).getPageCount(), 2);
+  for (const box of Object.values(consentMap.docuseal)) {
+    const a = docusealArea(box);
+    for (const k of ['x', 'y', 'w', 'h']) assert.ok(a[k] >= 0 && a[k] <= 1, `${k}=${a[k]}`);
+  }
+});

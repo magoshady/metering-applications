@@ -27,15 +27,17 @@
     "cc": [],
     "subjectTemplate": "Solar meter alteration – NMI {{nmi}} – {{street}}, {{suburb}}",
     "handler": "agl",
-    "needsCustomerSignature": false,
+    "needsCustomerSignature": true,
     "attachments": [
       "agl_form",
+      "agl_consent_signed",
       "ccew",
       "network_letter"
     ],
     "phone": "1800 680 430",
     "enabled": true,
-    "form": "agl"
+    "form": "agl",
+    "consentForm": "agl-consent"
   },
   "globird": {
     "label": "GloBird",
