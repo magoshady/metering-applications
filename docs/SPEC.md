@@ -51,8 +51,8 @@ Then track every application to completion (chase at day 10, escalate at day 20,
 
 ### Existing workflows you must know about (do not break them)
 
-- **PTC Approval DER workflow**: Gmail trigger on labelled emails → downloads attachments → IF on subject → Anthropic "Analyze document" extracts **NMI** and **AEMO DER Register job number** from the PDF whose filename contains `_PTC_`. **This is where network approval letters already arrive.** Phase 0 extends it (see §5.3). Do not rewrite it; add nodes at the end.
-- **Intellihub "ORDER COMPLETED" parser**: parses Airtable-sent Intellihub emails for meter exchange/reconfiguration completion and extracts the NMI from the HTML body. Phase 4 hooks into this to close applications.
+- **PTC Approval DER workflow**: Gmail trigger on labelled emails → downloads attachments → IF on subject → Anthropic "Analyze document" extracts **NMI** and **AEMO DER Register job number** from the PDF whose filename contains `_PTC_`. **This is where network approval letters already arrive.** **Do not modify it.** MTR runs its own parallel workflow on the same emails (see §5.3); the original is switched off later if and when MTR fully replaces it.
+- **Intellihub "ORDER COMPLETED" parser**: parses Airtable-sent Intellihub emails for meter exchange/reconfiguration completion and extracts the NMI from the HTML body. **Do not modify it.** Phase 4 uses a separate MTR workflow watching the same emails (see §6.0); the original is switched off later if needed.
 - **CCEW automation** (`ccew-form-v1.vercel.app`) and **PDF-to-PNG for CCEW uploads**. The CCEW PDF source is here. `[CONFIRM]` where the final CCEW PDF lives (HubSpot file on the deal? Drive? GreenDeal?).
 - OpenSolar → HubSpot webhook at `/webhook/other-component-update`. Irrelevant here, but don't reuse that path.
 
@@ -251,7 +251,7 @@ For each PDF:
 
 ### 5.3 Getting the network letter and CCEW onto the deal
 
-- **Network letter**: extend the existing **PTC Approval DER workflow**. After it extracts the NMI and DER job number:
+- **Network letter**: new workflow `MTR – 05 Network Letter Intake`, running in parallel with the existing **PTC Approval DER workflow** (left untouched). It uses its own Gmail trigger on the same label, with the same attachment/filename logic and Anthropic extraction of NMI and DER job number. It must not remove labels or mark emails read, so the original workflow still sees every email. After extraction:
   1. Find the deal by `nmi` (HubSpot search, pipeline `978394588`). If 0 or >1 matches → Gmail alert to Rodrigo, stop.
   2. Upload the PDF to HubSpot Files (folder `metering/network-letters/`, private access), attach it to the deal via a note, write `network_approval_letter_url`.
   3. Ask the Anthropic node to also extract the **approval reference number** and **distributor** → write `network_approval_reference`; if `electricity_distributor` is blank, fill it.
@@ -276,7 +276,8 @@ For each PDF:
 | `MTR – 30 DocuSeal Completed` | Webhook from DocuSeal | Download signed PDF → call the retailer's send step |
 | `MTR – 40 Chaser` | Schedule daily 8am AEST | Day-10 chase email, day-20 escalation task |
 | `MTR – 41 Reply Watcher` | Gmail trigger on the sending mailbox, label `Metering/Replies` | Detect retailer acknowledgements, capture reference |
-| `MTR – 42 Completion Hook` | Called from existing Intellihub parser | Mark completed |
+| `MTR – 05 Network Letter Intake` | Gmail trigger, same label as PTC Approval DER (read-only, parallel) | Extract NMI/job no., attach letter to deal |
+| `MTR – 42 Completion Hook` | Own Gmail trigger on the Intellihub "ORDER COMPLETED" emails (parallel to existing parser, which is untouched) | Extract NMI, mark completed |
 | `MTR – 99 Error Handler` | n8n Error Trigger | Gmail alert to Rodrigo with execution link |
 
 Set `MTR – 99` as the **error workflow** on every MTR workflow.
