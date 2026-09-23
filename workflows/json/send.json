@@ -548,6 +548,19 @@
         }
       },
       "executeOnce": true
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1920,
+        0
+      ],
+      "id": "6c031f5a-8fae-4e34-ab4d-e8b1e8ee9f86",
+      "name": "Wait For All Files"
     }
   ],
   "connections": {
@@ -631,7 +644,7 @@
       "main": [
         [
           {
-            "node": "Collect Files",
+            "node": "Wait For All Files",
             "type": "main",
             "index": 0
           }
@@ -649,9 +662,9 @@
       "main": [
         [
           {
-            "node": "Collect Files",
+            "node": "Wait For All Files",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ],
         [
@@ -667,14 +680,25 @@
       "main": [
         [
           {
-            "node": "Collect Files",
+            "node": "Wait For All Files",
             "type": "main",
-            "index": 0
+            "index": 2
           }
         ],
         [
           {
             "node": "File Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For All Files": {
+      "main": [
+        [
+          {
+            "node": "Collect Files",
             "type": "main",
             "index": 0
           }

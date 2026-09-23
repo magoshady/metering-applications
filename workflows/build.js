@@ -280,7 +280,9 @@ return a.uploads.map((u) => ({ json: { dealId: a.dealId, name: u.name }, binary:
   w.chain(t, fresh, plan, sw);
   w.connect(sw, fil, 0); w.connect(sw, sig, 1); w.connect(sw, dlu, 2);
   w.connect(sig, dlh, 0);
-  w.connect(fil, merge, 0); w.connect(dlh, merge, 0); w.connect(dlu, merge, 0);
+  const wait = w.node('Wait For All Files', 'n8n-nodes-base.merge', 3, { numberInputs: 3 }, { position: [1920, 0] });
+  w.connect(fil, wait, 0, 0); w.connect(dlh, wait, 0, 1); w.connect(dlu, wait, 0, 2);
+  w.connect(wait, merge);
   w.connect(fil, fail, 1); w.connect(sig, fail, 1); w.connect(dlh, fail, 1); w.connect(dlu, fail, 1);
   w.connect(merge, route);
   w.connect(route, ds, 0); w.chain(ds, dsPost, dsUpd, dsPatch);
