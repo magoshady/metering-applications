@@ -226,7 +226,7 @@ Every retailer has an `enabled` flag. **Only `energyaustralia` is enabled at the
 
 | Retailer | Required | Nice to have |
 |---|---|---|
-| EnergyAustralia | EA "Service Works Request" form (NSW/ACT/SA new connection, alteration or solar upgrade), filled + signed by account holder; landlord permission letter if leased | CCEW, network letter |
+| EnergyAustralia | EA "Service Works Request" form, filled + signed by Impressive as applicant | CCEW, network letter |
 | AGL | AGL Electricity application form (PDF) with: meter phases, REC name/licence/phone/ASP no. (alteration) or panel install date + inverter-on date (exchange); **homeowner meter request consent form** if we lodge on their behalf | network letter (Ausgrid CNL / Endeavour & Essential PTC) |
 | GloBird | The distributor letter only: Ausgrid CNL / Endeavour Connection of Generator / Essential CSO | |
 | Amber | Compliance certificate + network approval `[CONFIRM for NSW; their article names VIC's CES/EWR]` | |
@@ -316,7 +316,7 @@ roperties to fetch: every READ property in §3.2 plus the new ones.
    - Contact has first name, last name, email, mobile
    - Site address complete
    - `installer` set (to pick REC details)
-5. On validation failure → `metering_status = Metering Issues Not Sent On Hold`, append log, create **task** on the deal owned by `[CONFIRM: admin owner id]` titled `Metering blocked – <reasons>`, stop.
+5. On validation failure → `metering_status = Metering Issues Not Sent On Hold`, append log, create **task** on the deal owned by Rodrigo Candi (owner `360340383`) titled `Metering blocked – <reasons>`, stop.
 6. **Lock**: write `metering_status = Awaiting Manual Lodgement` or a temporary lock value `[CONFIRM new option]` before calling the handler, so a second poll can't double-send. (If no new option is approved, write `metering_automation_log` line `LOCK <executionId>` and check for it.)
 7. **Route**: look up `Retailer Config`; if `enabled=false` → Manual Task Handler; else Execute the handler sub-workflow with a single normalised **Job object** (§6.2).
 
@@ -362,7 +362,7 @@ Data sources (decided):
 
 Steps:
 1. Fill via the **Vercel function** `POST /api/ea-form` (this repo, `api/ea-form.js`; header `x-api-key` = `FILLER_API_KEY`; body = job object; returns `application/pdf`, or 400 `{ error }` → hold + alert). It wraps `src/fillEaForm.js` and `forms/ea-fieldmap.json`. The output is flattened. Ticks: Solar alteration; Residential; off peak per above; phase change No; Solar system New.
-2. If `property_ownership` is not Owner-occupier → task "Get landlord permission letter", hold, stop (EA requires the owner's letter for leased premises).
+2. No landlord check: Impressive only ever deals with the homeowner (decided; `property_ownership` not created).
 3. Stamp the signature image into `Signature79` and today's date into `Text78`. Upload the signed form to HubSpot Files (`metering/signed-forms/`) and note it on the deal.
 4. Email EA from Rod's Impressive Batteries' Email:
    - To: `solarconnections@energyaustralia.com.au`
@@ -371,26 +371,14 @@ Steps:
    - Attach: signed EA form, CCEW PDF, network letter.
 5. After send: `metering_status = Metering Application Sent`, `metering_application_date = today`, log Gmail message + thread ID, create ticket "Metering application lodged – EnergyAustralia", and **move the deal to stage `1509971393`** ("Install Complete and metering forms submitted for first time PV installations…").
 
-### 6.4 `MTR – 11 AGL Handler` (Phase 2)
+### 6.4 AGL, GloBird, Amber (decided): all go through `MTR – 10 Send Application`
 
-- Primary AGL channel is their online new connections platform; we use the **PDF + email fallback** that AGL publishes.
-- Decide **alteration vs exchange**: `existing_smart_meter = No` → exchange; else alteration `[CONFIRM mapping]`.
-  - Alteration fields: number of meter phases, REC name, licence no., contact number, FSP/ASP number.
-  - Exchange fields: panel install date (`installation_date`), inverter switch-on date (`installation_completion_date`).
-- Because we lodge on the homeowner's behalf, the **meter request consent form** must be signed by the homeowner → DocuSeal packet with **both** documents.
-- Supply address and meter details must match the latest AGL invoice. `[CONFIRM]` whether we have the bill on file (HubSpot file? `average_electricity_bill` suggests bills are collected at sale).
-- To: `aglnewconns@agl.com.au`. Subject: `Solar meter {{alteration|exchange}} – NMI {{nmi}} – {{address}}`.
+One sender workflow for every `email_auto` retailer; `config/retailers.json` says who to email and what to attach. Adding a retailer is a config line.
 
-### 6.5 `MTR – 12 GloBird Handler` (Phase 2)
-
-- No signature needed. Attach the distributor letter only.
-- Validate the letter type matches the distributor (CNL for Ausgrid, Connection of Generator for Endeavour, CSO for Essential). The PTC extension should store a `letterType` in the log; if unknown → hold.
-- To: `cs@globirdenergy.com.au`. Subject: `Solar meter configuration – NMI {{nmi}} – {{address}}`.
-- GloBird replies with timeframe/charges/consent needed → Reply Watcher flags it for a human.
-
-### 6.6 `MTR – 13 Amber`, `MTR – 14 1st Energy` (Phase 2)
-
-Simple email handlers: CCEW + network letter + install date in body. **Disabled until the `[CONFIRM]` items in §4.2 are resolved.**
+- **AGL**: form `forms/agl.pdf` (AGL1629, June 2021). Not fillable: `forms/agl-fieldmap.json` holds box coordinates; filled by the Vercel function `POST /api/agl-form`. Addition/Alteration → Solar installation; Install controlled load if `dedicated_controlled_load = Yes - Add`, Other "Remove controlled load" if `Yes - Remove`. Section 3a = homeowner (name, mobile, email); **3b authorised contact = Rodrigo Candi / Impressive, who signs** (no DocuSeal, no separate consent form). Section 4 = Sam Husband 279684C. Network approval goes in the PV SEG line. Attach AGL form + CCEW + network letter. To `aglnewconns@agl.com.au`.
+- **GloBird**: network letter only. To `cs@globirdenergy.com.au`.
+- **Amber**: CCEW + network letter (approved for NSW). To `info@amber.com.au`.
+- **1st Energy**: no email or process known → manual task (`MTR – 20`) until one is found.
 
 ### 6.7 `MTR – 20 Manual Task Handler` (Phase 3)
 
@@ -400,8 +388,8 @@ For Origin, phone routes and anything disabled/unknown:
 2. Create a HubSpot **task** on the deal:
    - Title: `Lodge metering – {{Retailer}} ({{route}}) – NMI {{nmi}}`
    - Body: retailer phone/portal link, the data sheet, links to CCEW and network letter, and the three questions to ask phone-route retailers the first time (which inbox, which documents per distributor, can an installer lodge with signed customer authority).
-   - Owner: `[CONFIRM admin owner id]`; due: +1 business day.
-3. `metering_status = Awaiting Manual Lodgement` `[CONFIRM option]`.
+   - Owner: Rodrigo Candi (owner `360340383`); due: +1 business day.
+3. `metering_status = Awaiting Manual Lodgement`.
 4. Poll tasks (in `MTR – 40`): when the task is completed → set `Metering Application Sent`, date, stage move.
 
 ### 6.8 `MTR – 30 DocuSeal Completed`

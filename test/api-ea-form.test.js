@@ -4,6 +4,7 @@ const { PDFDocument } = require('pdf-lib');
 
 process.env.FILLER_API_KEY = 'test-key';
 const handler = require('../api/ea-form');
+const aglHandler = require('../api/agl-form');
 const job = require('./fixtures/ea-job.json');
 
 function call({ method = 'POST', key = 'test-key', body = job } = {}) {
@@ -47,4 +48,17 @@ test('returns a flattened PDF', async () => {
   const doc = await PDFDocument.load(r.body);
   assert.strictEqual(doc.getPageCount(), 3);
   assert.strictEqual(doc.getForm().getFields().length, 0);
+});
+
+test('AGL endpoint returns a PDF and requires the contact details', async () => {
+  const run = (body) => new Promise((resolve) => {
+    const res = { headers: {}, code: 200, setHeader(k, v) { this.headers[k.toLowerCase()] = v; },
+      status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, json: b }); },
+      send(b) { resolve({ code: this.code, headers: this.headers }); } };
+    aglHandler({ method: 'POST', headers: { 'x-api-key': 'test-key' }, body }, res);
+  });
+  assert.strictEqual((await run(job)).headers['content-type'], 'application/pdf');
+  const r = await run({ ...job, accountHolder: { ...job.accountHolder, email: '' } });
+  assert.strictEqual(r.code, 400);
+  assert.match(r.json.error, /accountHolder\.email/);
 });

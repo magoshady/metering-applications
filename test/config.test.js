@@ -22,7 +22,16 @@ test('every configured route is a metering_route option', () => {
   for (const [k, r] of Object.entries(retailers)) assert.ok(ROUTES.includes(r.route), `${k}: ${r.route}`);
 });
 
-test('Phase 1: only EnergyAustralia is enabled for automatic email', () => {
+test('automatic email retailers: EA, AGL, GloBird, Amber', () => {
   const auto = Object.entries(retailers).filter(([, r]) => r.route === 'email_auto' && r.enabled).map(([k]) => k);
-  assert.deepStrictEqual(auto, ['energyaustralia']);
+  assert.deepStrictEqual(auto.sort(), ['agl', 'amber', 'energyaustralia', 'globird']);
+});
+
+test('every email retailer has a recipient and every form has a filler endpoint', () => {
+  const fs = require('fs');
+  for (const [k, r] of Object.entries(retailers)) {
+    if (r.route !== 'email_auto') continue;
+    assert.ok(r.to && r.to.length, `${k} has no recipient`);
+    if (r.form) assert.ok(fs.existsSync(`${__dirname}/../api/${r.form}-form.js`), `${k}: api/${r.form}-form.js missing`);
+  }
 });
