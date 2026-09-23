@@ -38,7 +38,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rule = {\"name\":\"Endeavour\",\"label\":\"Label_5823373004158048354\",\"skip\":\"Thank you for your Application Submission\",\"pick\":\"_PTC_\"};\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const subject = j.subject || j.headers?.subject || '';\n  if (rule.skip && subject.includes(rule.skip)) continue;\n  const bin = item.binary || {};\n  const keys = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));\n  const key = rule.pick ? keys.find((k) => (bin[k].fileName || '').toUpperCase().includes(rule.pick)) : (keys.includes('attachment_0') ? 'attachment_0' : keys[0]);\n  if (!key) continue;\n  out.push({ json: { distributor: rule.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });\n}\nreturn out;"
+        "jsCode": "const d = {\"name\":\"Endeavour\",\"label\":\"Label_5823373004158048354\",\"skip\":\"Thank you for your Application Submission\"};\nconst rule = ({\"_about\":\"How MTR – 03 finds the network approval letter among a deal's HubSpot attachments (file names, case-insensitive regex). Newest match wins. A note starting 'Network approval' (written by MTR – 05) is also accepted.\",\"Ausgrid\":{\"fileName\":\"^Notification Letter\",\"_note\":\"Confirmed by Rodrigo 23 Sep 2026: the Notification Letter is the approval retailers need.\"},\"Endeavour\":{\"fileName\":\"_PTC_\",\"_note\":\"Same rule as the Endeavour PTC workflow\"},\"Essential\":{\"fileName\":null,\"_note\":\"Rare. No file name rule yet: Essential deals hold until the letter is attached as a note starting \\\"Network approval\\\".\"}})[d.name] || {};\nconst re = rule.fileName ? new RegExp(rule.fileName, 'i') : null;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const subject = j.subject || j.headers?.subject || '';\n  if (d.skip && subject.includes(d.skip)) continue;\n  const bin = item.binary || {};\n  const pdfs = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));\n  // With a file-name rule, only the matching PDF is the approval; otherwise the first PDF.\n  const key = re ? pdfs.find((k) => re.test(bin[k].fileName || '')) : pdfs[0];\n  if (!key) continue;\n  out.push({ json: { distributor: d.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });\n}\nreturn out;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -86,7 +86,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rule = {\"name\":\"Ausgrid\",\"label\":\"Label_3303489167417198909\",\"skip\":\"Thank you for your Application Submission\",\"pick\":null};\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const subject = j.subject || j.headers?.subject || '';\n  if (rule.skip && subject.includes(rule.skip)) continue;\n  const bin = item.binary || {};\n  const keys = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));\n  const key = rule.pick ? keys.find((k) => (bin[k].fileName || '').toUpperCase().includes(rule.pick)) : (keys.includes('attachment_0') ? 'attachment_0' : keys[0]);\n  if (!key) continue;\n  out.push({ json: { distributor: rule.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });\n}\nreturn out;"
+        "jsCode": "const d = {\"name\":\"Ausgrid\",\"label\":\"Label_3303489167417198909\",\"skip\":\"Thank you for your Application Submission\"};\nconst rule = ({\"_about\":\"How MTR – 03 finds the network approval letter among a deal's HubSpot attachments (file names, case-insensitive regex). Newest match wins. A note starting 'Network approval' (written by MTR – 05) is also accepted.\",\"Ausgrid\":{\"fileName\":\"^Notification Letter\",\"_note\":\"Confirmed by Rodrigo 23 Sep 2026: the Notification Letter is the approval retailers need.\"},\"Endeavour\":{\"fileName\":\"_PTC_\",\"_note\":\"Same rule as the Endeavour PTC workflow\"},\"Essential\":{\"fileName\":null,\"_note\":\"Rare. No file name rule yet: Essential deals hold until the letter is attached as a note starting \\\"Network approval\\\".\"}})[d.name] || {};\nconst re = rule.fileName ? new RegExp(rule.fileName, 'i') : null;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const subject = j.subject || j.headers?.subject || '';\n  if (d.skip && subject.includes(d.skip)) continue;\n  const bin = item.binary || {};\n  const pdfs = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));\n  // With a file-name rule, only the matching PDF is the approval; otherwise the first PDF.\n  const key = re ? pdfs.find((k) => re.test(bin[k].fileName || '')) : pdfs[0];\n  if (!key) continue;\n  out.push({ json: { distributor: d.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });\n}\nreturn out;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -134,7 +134,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rule = {\"name\":\"Essential\",\"label\":\"Label_592177598515650554\",\"skip\":\"Essential Energy Connection Application Approved\",\"pick\":null};\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const subject = j.subject || j.headers?.subject || '';\n  if (rule.skip && subject.includes(rule.skip)) continue;\n  const bin = item.binary || {};\n  const keys = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));\n  const key = rule.pick ? keys.find((k) => (bin[k].fileName || '').toUpperCase().includes(rule.pick)) : (keys.includes('attachment_0') ? 'attachment_0' : keys[0]);\n  if (!key) continue;\n  out.push({ json: { distributor: rule.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });\n}\nreturn out;"
+        "jsCode": "const d = {\"name\":\"Essential\",\"label\":\"Label_592177598515650554\",\"skip\":\"Essential Energy Connection Application Approved\"};\nconst rule = ({\"_about\":\"How MTR – 03 finds the network approval letter among a deal's HubSpot attachments (file names, case-insensitive regex). Newest match wins. A note starting 'Network approval' (written by MTR – 05) is also accepted.\",\"Ausgrid\":{\"fileName\":\"^Notification Letter\",\"_note\":\"Confirmed by Rodrigo 23 Sep 2026: the Notification Letter is the approval retailers need.\"},\"Endeavour\":{\"fileName\":\"_PTC_\",\"_note\":\"Same rule as the Endeavour PTC workflow\"},\"Essential\":{\"fileName\":null,\"_note\":\"Rare. No file name rule yet: Essential deals hold until the letter is attached as a note starting \\\"Network approval\\\".\"}})[d.name] || {};\nconst re = rule.fileName ? new RegExp(rule.fileName, 'i') : null;\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const subject = j.subject || j.headers?.subject || '';\n  if (d.skip && subject.includes(d.skip)) continue;\n  const bin = item.binary || {};\n  const pdfs = Object.keys(bin).filter((k) => /pdf/i.test(bin[k].mimeType || '') || /\\.pdf$/i.test(bin[k].fileName || ''));\n  // With a file-name rule, only the matching PDF is the approval; otherwise the first PDF.\n  const key = re ? pdfs.find((k) => re.test(bin[k].fileName || '')) : pdfs[0];\n  if (!key) continue;\n  out.push({ json: { distributor: d.name, subject, messageId: j.id, fileName: bin[key].fileName }, binary: { letter: bin[key] } });\n}\nreturn out;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -146,6 +146,17 @@
       "name": "Pick PDF (Essential)"
     },
     {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        480,
+        0
+      ],
+      "id": "77e229ec-52e6-479f-a979-8a4b3102b3f9",
+      "name": "Letters"
+    },
+    {
       "parameters": {
         "resource": "document",
         "modelId": {
@@ -154,7 +165,7 @@
           "mode": "list",
           "cachedResultName": "claude-sonnet-4-5-20250929"
         },
-        "text": "This PDF should be an NSW electricity distributor approval for a solar/battery connection (Ausgrid CNL, Endeavour PTC / connection of generator, Essential CSO/connection approval). Reply with JSON only, no prose: {\"isApprovalLetter\": true|false, \"nmi\": \"<NMI exactly as printed>\", \"reference\": \"<the distributor's approval / job / reference number>\", \"distributor\": \"Ausgrid\"|\"Endeavour\"|\"Essential\"}",
+        "text": "This PDF should be an NSW electricity distributor approval for a solar/battery connection (Ausgrid Notification Letter, Endeavour PTC / connection of generator, Essential connection approval). Reply with JSON only, no prose: {\"isApprovalLetter\": true|false, \"nmi\": \"<NMI exactly as printed>\", \"reference\": \"<the distributor's approval / job / reference number>\", \"distributor\": \"Ausgrid\"|\"Endeavour\"|\"Essential\"}",
         "inputType": "binary",
         "binaryPropertyName": "letter",
         "options": {}
@@ -162,7 +173,7 @@
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
       "position": [
-        480,
+        720,
         0
       ],
       "id": "bb4ce4c5-b6b5-4368-abd7-e09f241c0a5e",
@@ -175,24 +186,13 @@
       }
     },
     {
-      "parameters": {},
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        360,
-        0
-      ],
-      "id": "77e229ec-52e6-479f-a979-8a4b3102b3f9",
-      "name": "Letters"
-    },
-    {
       "parameters": {
-        "jsCode": "const out = [];\n$input.all().forEach((item, i) => {\n  const src = $('Letters').itemMatching(i);\n  const raw = item.json.content?.[0]?.text || item.json.text || '';\n  let p;\n  try { p = JSON.parse(String(raw).replace(/^```json\\s*/, '').replace(/\\s*```$/, '').trim()); } catch (e) { throw new Error('Network letter \"' + src.json.fileName + '\": could not read Claude reply: ' + raw.slice(0, 200)); }\n  if (!p.isApprovalLetter) return;\n  const nmi = String(p.nmi || '').replace(/\\s/g, '').toUpperCase();\n  if (!/^[A-Z0-9]{10,11}$/.test(nmi)) throw new Error('Network letter \"' + src.json.fileName + '\": NMI \"' + p.nmi + '\" not valid');\n  out.push({ json: { ...src.json, nmi, nmi10: nmi.slice(0, 10), reference: String(p.reference || '').trim(), distributor: p.distributor || src.json.distributor }, binary: src.binary });\n});\nreturn out;"
+        "jsCode": "const out = [];\n$input.all().forEach((item, i) => {\n  const src = $('Letters').itemMatching(i);\n  const raw = item.json.content?.[0]?.text || item.json.text || '';\n  let p;\n  try { p = JSON.parse(String(raw).replace(/^```json\\s*/, '').replace(/\\s*```$/, '').trim()); } catch (e) { throw new Error('Network letter \"' + src.json.fileName + '\": could not read Claude reply: ' + raw.slice(0, 200)); }\n  if (!p.isApprovalLetter) return;\n  const nmi = String(p.nmi || '').replace(/\\s/g, '').toUpperCase();\n  if (!/^[A-Z0-9]{10,11}$/.test(nmi)) throw new Error('Network letter \"' + src.json.fileName + '\": NMI \"' + p.nmi + '\" not valid');\n  out.push({ json: { ...src.json, nmi, nmi10: nmi.slice(0, 10), reference: String(p.reference || '').trim() }, binary: src.binary });\n});\nreturn out;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        720,
+        960,
         0
       ],
       "id": "b19be22e-87b1-479f-a8d3-2007bf9eda33",
@@ -200,153 +200,32 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "hubspotAppToken",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'nmi', operator: 'CONTAINS_TOKEN', value: $json.nmi10 + '*' }, { propertyName: 'pipeline', operator: 'EQ', value: '978394588' }] }], properties: ['dealname', 'nmi', 'network_approval_reference', 'electricity_distributor', 'metering_automation_log'], limit: 5 }) }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        960,
-        0
-      ],
-      "id": "5d08855a-8e95-44e9-af35-382372acd6f0",
-      "name": "Find Deal By NMI",
-      "credentials": {
-        "hubspotAppToken": {
-          "id": "DK6aUhoyZ42IbfNM",
-          "name": "Impressive Batterie's Hubspot"
+        "workflowId": {
+          "__rl": true,
+          "value": "0i8xK26d8BFXg3Gf",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
         }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const out = [];\n$input.all().forEach((item, i) => {\n  const src = $('Parse Letter').itemMatching(i);\n  const hits = (item.json.results || []).filter((d) => String(d.properties.nmi || '').toUpperCase().replace(/\\s/g, '').startsWith(src.json.nmi10));\n  if (hits.length !== 1) throw new Error('Network letter NMI ' + src.json.nmi + ' (' + src.json.distributor + ', ref ' + src.json.reference + ') matched ' + hits.length + ' deals in the pipeline; attach it by hand');\n  out.push({ json: { ...src.json, dealId: hits[0].id, deal: hits[0].properties }, binary: src.binary });\n});\nreturn out;"
       },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
       "position": [
         1200,
         0
       ],
-      "id": "e5ab653b-cbe1-44f6-a7ed-a5f541dfa36d",
-      "name": "Exactly One Deal"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.hubapi.com/files/v3/files",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "hubspotAppToken",
-        "sendBody": true,
-        "contentType": "multipart-form-data",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "parameterType": "formBinaryData",
-              "name": "file",
-              "inputDataFieldName": "letter"
-            },
-            {
-              "name": "folderPath",
-              "value": "/metering/network-letters"
-            },
-            {
-              "name": "fileName",
-              "value": "={{ $json.dealId }} {{ $json.distributor }} network approval {{ $json.reference }}.pdf"
-            },
-            {
-              "name": "options",
-              "value": "{\"access\":\"PRIVATE\",\"overwrite\":false}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1440,
-        0
-      ],
-      "id": "6499358e-8943-4bb8-a1cf-cd6fea16131b",
-      "name": "Upload Letter",
-      "credentials": {
-        "hubspotAppToken": {
-          "id": "DK6aUhoyZ42IbfNM",
-          "name": "Impressive Batterie's Hubspot"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.hubapi.com/crm/v3/objects/notes",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "hubspotAppToken",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ properties: { hs_timestamp: new Date().toISOString(), hs_note_body: 'Network approval ' + $('Exactly One Deal').item.json.reference + ' (' + $('Exactly One Deal').item.json.distributor + ') attached via n8n', hs_attachment_ids: String($json.id) }, associations: [{ to: { id: $('Exactly One Deal').item.json.dealId }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 214 }] }] }) }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1680,
-        0
-      ],
-      "id": "d04ea0dd-538f-4692-aa2c-565def2c99ee",
-      "name": "Note On Deal",
-      "credentials": {
-        "hubspotAppToken": {
-          "id": "DK6aUhoyZ42IbfNM",
-          "name": "Impressive Batterie's Hubspot"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "\nfunction appendLog(old, line) {\n  const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' }).format(new Date());\n  const lines = String(old || '').split('\\n').filter(Boolean);\n  lines.push(stamp + ' ' + line);\n  return lines.slice(-30).join('\\n');\n}\nreturn $input.all().map((item, i) => {\n  const s = $('Exactly One Deal').itemMatching(i).json;\n  const f = $('Upload Letter').itemMatching(i).json;\n  const properties = {\n    network_approval_reference: s.reference,\n    network_approval_letter_url: f.url || '',\n    metering_automation_log: appendLog(s.deal.metering_automation_log, 'Network approval ' + s.reference + ' attached (file ' + f.id + ')'),\n  };\n  if (!s.deal.electricity_distributor && ['Ausgrid', 'Endeavour', 'Essential'].includes(s.distributor)) properties.electricity_distributor = s.distributor;\n  return { json: { dealId: s.dealId, properties } };\n});"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1920,
-        0
-      ],
-      "id": "becf9d2a-a17c-4de6-ac29-47054e4886b0",
-      "name": "Deal Updates"
-    },
-    {
-      "parameters": {
-        "method": "PATCH",
-        "url": "={{ 'https://api.hubapi.com/crm/v3/objects/deals/' + $json.dealId }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "hubspotAppToken",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ properties: $json.properties }) }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2160,
-        0
-      ],
-      "id": "0933dee5-f15c-48c4-a640-0bd4b5e8ecd6",
-      "name": "Update Deal",
-      "credentials": {
-        "hubspotAppToken": {
-          "id": "DK6aUhoyZ42IbfNM",
-          "name": "Impressive Batterie's Hubspot"
-        }
-      }
+      "id": "670e0463-b783-4285-a6fa-9e1972818f23",
+      "name": "Attach Letter (each)"
     }
   ],
   "connections": {
@@ -442,62 +321,7 @@
       "main": [
         [
           {
-            "node": "Find Deal By NMI",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Find Deal By NMI": {
-      "main": [
-        [
-          {
-            "node": "Exactly One Deal",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Exactly One Deal": {
-      "main": [
-        [
-          {
-            "node": "Upload Letter",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Upload Letter": {
-      "main": [
-        [
-          {
-            "node": "Note On Deal",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Note On Deal": {
-      "main": [
-        [
-          {
-            "node": "Deal Updates",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Deal Updates": {
-      "main": [
-        [
-          {
-            "node": "Update Deal",
+            "node": "Attach Letter (each)",
             "type": "main",
             "index": 0
           }

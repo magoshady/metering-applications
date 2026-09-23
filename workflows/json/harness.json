@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const j = $input.first().json;\nif ((j.headers || {})['x-mtr-test'] !== \"58bed84fb4c24a45ed5c6fd6018fff5230ebc19425d83e8d\") throw new Error('bad test token');\nconst b = j.body || {};\nreturn [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter: !!b.pretendLetter, asRetailer: b.asRetailer || '', messageId: '' } }];"
+        "jsCode": "const j = $input.first().json;\nif ((j.headers || {})['x-mtr-test'] !== \"58bed84fb4c24a45ed5c6fd6018fff5230ebc19425d83e8d\") throw new Error('bad test token');\nconst b = j.body || {};\nreturn [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter: !!b.pretendLetter, asRetailer: b.asRetailer || '', messageId: '', letter: b.letter || null } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -103,6 +103,29 @@
               },
               "renameOutput": true,
               "outputKey": "send"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "letter",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "letter"
             }
           ]
         },
@@ -326,31 +349,65 @@
       ],
       "id": "948ec773-c1de-405e-aa8e-39846a9bab2f",
       "name": "Send Result"
+    },
+    {
+      "parameters": {
+        "jsCode": "const l = $('Check Token').first().json.letter;\nconst nmi = String(l.nmi).toUpperCase();\nreturn [{ json: { distributor: l.distributor, fileName: l.fileName, nmi, nmi10: nmi.slice(0, 10), reference: l.reference || '', messageId: '', testOnly: true }, binary: { letter: await this.helpers.prepareBinaryData(Buffer.from('%PDF-1.4 test'), l.fileName, 'application/pdf') } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        400
+      ],
+      "id": "6636d44f-1c30-4e9d-a7b2-c4512a539f1d",
+      "name": "Letter Input"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "0i8xK26d8BFXg3Gf",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        400
+      ],
+      "id": "37bdb098-5e8d-4fcc-a282-efc858181ad7",
+      "name": "Attach Letter"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true, items: $input.all().map((i) => i.json) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        400
+      ],
+      "id": "fdf58d00-5c24-4754-a185-5a989fc96763",
+      "name": "Letter Result",
+      "alwaysOutputData": true
     }
   ],
   "connections": {
-    "Test Webhook": {
-      "main": [
-        [
-          {
-            "node": "Check Token",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Token": {
-      "main": [
-        [
-          {
-            "node": "By Mode",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "By Mode": {
       "main": [
         [
@@ -370,6 +427,57 @@
         [
           {
             "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Letter Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Letter Input": {
+      "main": [
+        [
+          {
+            "node": "Attach Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Letter": {
+      "main": [
+        [
+          {
+            "node": "Letter Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Token": {
+      "main": [
+        [
+          {
+            "node": "By Mode",
             "type": "main",
             "index": 0
           }
