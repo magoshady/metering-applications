@@ -18,7 +18,7 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "__settings__",
+          "value": "FjT3zT91PYYQGYCc",
           "mode": "id"
         },
         "workflowInputs": {
@@ -60,7 +60,7 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "__buildJob__",
+          "value": "6b91NqzIvCJTc1ez",
           "mode": "id"
         },
         "workflowInputs": {
@@ -234,7 +234,7 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "__send__",
+          "value": "qX1JwgbW9ALdP7cp",
           "mode": "id"
         },
         "workflowInputs": {
@@ -263,7 +263,7 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "__manualTask__",
+          "value": "Hiu7nPhZ2EWyeTsb",
           "mode": "id"
         },
         "workflowInputs": {
@@ -292,7 +292,7 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "__manualTask__",
+          "value": "Hiu7nPhZ2EWyeTsb",
           "mode": "id"
         },
         "workflowInputs": {
@@ -365,7 +365,7 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        1920,
+        2040,
         -80
       ],
       "id": "cedb9a43-7f38-4fcd-a468-893a6bcf5383",
@@ -387,7 +387,7 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        1920,
+        2040,
         80
       ],
       "id": "071493f3-1394-482c-ae70-838540984afd",
@@ -398,6 +398,78 @@
           "name": "Rod's Impressive Batteries' Email"
         }
       },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "msg",
+              "leftValue": "={{ $('Prepare').first().json.messageId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1800,
+        -80
+      ],
+      "id": "953e9d2e-535b-4cdf-a596-857fb4f4c946",
+      "name": "From Email? (ok)",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "msg",
+              "leftValue": "={{ $('Prepare').first().json.messageId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1800,
+        80
+      ],
+      "id": "1f6d09ab-2562-461f-a506-6e831d266df3",
+      "name": "From Email? (error)",
       "executeOnce": true
     }
   ],
@@ -489,7 +561,7 @@
         ],
         [
           {
-            "node": "Label Processed",
+            "node": "From Email? (ok)",
             "type": "main",
             "index": 0
           }
@@ -500,7 +572,7 @@
       "main": [
         [
           {
-            "node": "Label Processed",
+            "node": "From Email? (ok)",
             "type": "main",
             "index": 0
           }
@@ -511,7 +583,7 @@
       "main": [
         [
           {
-            "node": "Label Processed",
+            "node": "From Email? (ok)",
             "type": "main",
             "index": 0
           }
@@ -533,7 +605,7 @@
       "main": [
         [
           {
-            "node": "Label Processed",
+            "node": "From Email? (ok)",
             "type": "main",
             "index": 0
           }
@@ -541,6 +613,28 @@
       ]
     },
     "Hold Task": {
+      "main": [
+        [
+          {
+            "node": "From Email? (error)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "From Email? (ok)": {
+      "main": [
+        [
+          {
+            "node": "Label Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "From Email? (error)": {
       "main": [
         [
           {

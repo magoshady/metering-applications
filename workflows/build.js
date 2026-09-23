@@ -39,7 +39,7 @@ const settings = {
   // tasks are emailed to testInbox instead, and the only HubSpot write is a
   // "[DRY RUN]" line in Metering Automation Log.
   dryRun: true,
-  testInbox: '',                       // e.g. 'metering-test@impressivebatteries.com.au'
+  testInbox: 'rodrigo@impressivebatteries.com.au',
   fillerUrl: 'https://metering-applications.vercel.app',
   docusealApi: 'https://docuseal.impressivebatteries.com.au/api',
   alertTo: 'rodrigo@impressivebatteries.com.au',
@@ -319,14 +319,22 @@ return [{ json: { dealId: i.dealId, properties } }];`), { position: [1440, 240] 
     { credentials: CRED.hubspot, position: [1680, 240] });
   const ok = w.node('Label Processed', 'n8n-nodes-base.gmail', 2.1, {
     operation: 'addLabels', messageId: "={{ $('Prepare').first().json.messageId }}", labelIds: "={{ [$('Get Settings').first().json.labelIds.processed] }}",
-  }, { credentials: CRED.gmail, position: [1920, -80], executeOnce: true });
+  }, { credentials: CRED.gmail, position: [2040, -80], executeOnce: true });
   const bad = w.node('Label Error', 'n8n-nodes-base.gmail', 2.1, {
     operation: 'addLabels', messageId: "={{ $('Prepare').first().json.messageId }}", labelIds: "={{ [$('Get Settings').first().json.labelIds.error] }}",
-  }, { credentials: CRED.gmail, position: [1920, 80], executeOnce: true });
+  }, { credentials: CRED.gmail, position: [2040, 80], executeOnce: true });
+  const ifMsg = (name, pos) => w.node(name, 'n8n-nodes-base.if', 2.2, {
+    conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+      conditions: [{ id: 'msg', leftValue: "={{ $('Prepare').first().json.messageId }}", rightValue: '', operator: { type: 'string', operation: 'notEmpty', singleValue: true } }], combinator: 'and' },
+    looseTypeValidation: true, options: {},
+  }, { position: pos, executeOnce: true });
+  const okIf = ifMsg('From Email? (ok)', [1800, -80]);
+  const badIf = ifMsg('From Email? (error)', [1800, 80]);
   w.chain(t, st, din, bj, prep, sw);
-  w.connect(sw, send, 0); w.connect(sw, man, 1); w.connect(sw, hold, 2); w.connect(sw, skip, 3); w.connect(sw, ok, 4);
-  w.connect(send, ok); w.connect(man, ok); w.connect(skip, skipPatch); w.connect(skipPatch, ok);
-  w.connect(hold, bad);
+  w.connect(sw, send, 0); w.connect(sw, man, 1); w.connect(sw, hold, 2); w.connect(sw, skip, 3); w.connect(sw, okIf, 4);
+  w.connect(send, okIf); w.connect(man, okIf); w.connect(skip, skipPatch); w.connect(skipPatch, okIf);
+  w.connect(hold, badIf);
+  w.connect(okIf, ok, 0); w.connect(badIf, bad, 0);
 });
 
 // ───────────────────────── MTR – 01 Trigger ─────────────────────────
@@ -486,11 +494,48 @@ W.harness = workflow('MTR – T Test Harness', (w) => {
   const chk = w.node('Check Token', 'n8n-nodes-base.code', 2, code(`const j = $input.first().json;
 if ((j.headers || {})['x-mtr-test'] !== ${JSON.stringify(token)}) throw new Error('bad test token');
 const b = j.body || {};
-return [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', form: b.form || '' } }];`));
-  const bj = w.node('Build Job', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('buildJob')));
+return [{ json: { dealId: String(b.dealId), mode: b.mode || 'job', pretendLetter: !!b.pretendLetter, asRetailer: b.asRetailer || '', messageId: '' } }];`));
+  const sw = w.node('By Mode', 'n8n-nodes-base.switch', 3.2, {
+    rules: { values: ['job', 'process', 'send'].map((k) => ({
+      conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+        conditions: [{ leftValue: '={{ $json.mode }}', rightValue: k, operator: { type: 'string', operation: 'equals' } }], combinator: 'and' },
+      renameOutput: true, outputKey: k })) }, options: {},
+  });
+  // job: read-only
+  const bj = w.node('Build Job', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('buildJob')), { position: [960, -200] });
   const out = w.node('Result', 'n8n-nodes-base.code', 2, code(`const r = $input.first().json;
-return [{ json: { action: r.action, reasons: r.reasons, retailerKey: r.retailerKey, job: r.job, dealUpdates: r.dealUpdates } }];`));
-  w.chain(h, chk, bj, out);
+return [{ json: { action: r.action, reasons: r.reasons, retailerKey: r.retailerKey, job: r.job, dealUpdates: r.dealUpdates } }];`), { position: [1200, -200] });
+  // process: the real MTR – 02 path without a Gmail message (dry-run settings apply)
+  const pr = w.node('Process Deal', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('process')), { position: [960, 0] });
+  const prOut = w.node('Process Result', 'n8n-nodes-base.code', 2, code(`return [{ json: { ok: true, items: $input.all().map((i) => i.json) } }];`), { position: [1200, 0] });
+  // send: force MTR – 10 on a deal; pretendLetter uses the CCEW file as the network letter (test only)
+  const st = w.node('Get Settings', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('settings')), { position: [960, 200] });
+  const din = w.node('Deal ID', 'n8n-nodes-base.code', 2, code(`return [{ json: { dealId: $('Check Token').first().json.dealId } }];`), { position: [1200, 200] });
+  const bj2 = w.node('Build Job (send)', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('buildJob')), { position: [1440, 200] });
+  const pre = w.node('Pretend', 'n8n-nodes-base.code', 2, code(`const r = $input.first().json;
+const settings = $('Get Settings').first().json;
+if (!settings.dryRun) throw new Error('send test only runs in dry run');
+// Test-only: log line marks it so nobody mistakes it for a real send.
+r.deal.properties.metering_automation_log = (r.deal.properties.metering_automation_log || '') + '';
+if ($('Check Token').first().json.pretendLetter && !r.job.networkApproval.fileId) {
+  r.job.networkApproval.fileId = r.job.ccew.fileId;
+  r.reasons = r.reasons.filter((x) => !/network approval letter/.test(x));
+  if (!r.reasons.length && r.action === 'hold') r.action = 'email';
+}
+const as = $('Check Token').first().json.asRetailer;
+if (as) {
+  const retailers = ${json('config/retailers.json')};
+  if (!retailers[as]) throw new Error('unknown retailer ' + as);
+  r.retailer = retailers[as]; r.retailerKey = as; r.job.retailerKey = as; r.job.retailerLabel = retailers[as].label;
+}
+if (r.action !== 'email') throw new Error('deal ' + r.dealId + ' is not sendable: ' + r.action + ' ' + r.reasons.join('; '));
+return [{ json: { ...r, settings } }];`), { position: [1680, 200] });
+  const sd = w.node('Send Application', 'n8n-nodes-base.executeWorkflow', 1.2, execWf(id('send')), { position: [1920, 200] });
+  const sdOut = w.node('Send Result', 'n8n-nodes-base.code', 2, code(`return [{ json: { ok: true, items: $input.all().map((i) => i.json) } }];`), { position: [2160, 200] });
+  w.chain(h, chk, sw);
+  w.connect(sw, bj, 0); w.connect(bj, out);
+  w.connect(sw, pr, 1); w.connect(pr, prOut);
+  w.connect(sw, st, 2); w.chain(st, din, bj2, pre, sd, sdOut);
 });
 
 // ───────────────────────── write ─────────────────────────

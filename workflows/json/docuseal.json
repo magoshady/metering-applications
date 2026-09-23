@@ -70,7 +70,7 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "__settings__",
+          "value": "FjT3zT91PYYQGYCc",
           "mode": "id"
         },
         "workflowInputs": {
@@ -112,7 +112,7 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "__buildJob__",
+          "value": "6b91NqzIvCJTc1ez",
           "mode": "id"
         },
         "workflowInputs": {
@@ -154,7 +154,7 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "__send__",
+          "value": "qX1JwgbW9ALdP7cp",
           "mode": "id"
         },
         "workflowInputs": {
