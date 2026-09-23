@@ -266,7 +266,7 @@ For each PDF:
 
 | Workflow | Trigger | Job |
 |---|---|---|
-| `MTR – 01 Trigger & Router` | Schedule every 15 min (poll) **or** HubSpot webhook on `dealstage` change | Find deals entering `1879662022`, validate, normalise, route |
+| `MTR – 01 Trigger & Router` | Gmail trigger (Rod's Impressive Batteries' Email), label `Metering 2.0` | Deal ID from subject → fetch deal, validate, normalise, route |
 | `MTR – 10 EA Handler` | Execute Workflow (sub) | Fill EA form → DocuSeal → on signed, email EA |
 | `MTR – 11 AGL Handler` | sub | Fill AGL PDF (+ consent) → DocuSeal → email |
 | `MTR – 12 GloBird Handler` | sub | Email network letter |
@@ -284,19 +284,15 @@ Set `MTR – 99` as the **error workflow** on every MTR workflow.
 
 ### 6.1 `MTR – 01 Trigger & Router`
 
-**Trigger choice.** Prefer **polling** (simple, robust): every 15 min, HubSpot search:
+***Trigger (decided).** A HubSpot workflow emails Rodrigo when a deal meets the criteria (deal stage, job status, NMI present, etc.). A Gmail filter applies the label `Metering 2.0`. `MTR – 01` uses a **Gmail Trigger** on n8n credential *Rod's Impressive Batteries' Email*, filtered to that label, polling every minute.
 
-```
-filterGroups: [{ filters: [
-  { propertyName: "pipeline", operator: "EQ", value: "978394588" },
-  { propertyName: "dealstage", operator: "EQ", value: "1879662022" },
-  { propertyName: "metering_status", operator: "NOT_HAS_PROPERTY" }
-]}]
-```
+1. **Deal ID** = the digits in the email subject (ignore `Fwd:`/other text). No number → label `Metering 2.0 - Error`, alert, stop.
+2. The email is only a signal: **all data comes from the HubSpot deal** fetched by ID.
+3. **Duplicate guard**: if `metering_status` already has a value → label `Metering 2.0 - Processed`, stop (no auto-retry; a human clears the status to retry).
+4. Re-check NMI and retailer even though the HubSpot criteria cover them (fields can change after the email).
+5. On finish, add label `Metering 2.0 - Processed` (success) or `Metering 2.0 - Error` (failure). The trigger itself never removes labels.
 
-(Use a second filter group for `metering_status` = `Metering Issues Not Sent On Hold` only if we want auto-retry after fixes; default **no auto-retry**; a human clears the status to retry.)
-
-Properties to fetch: every READ property in §3.2 plus the new ones.
+roperties to fetch: every READ property in §3.2 plus the new ones.
 
 **Steps:**
 1. **Fetch associations**: primary contact (account holder), and existing notes/files if needed.
