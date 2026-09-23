@@ -275,7 +275,7 @@ For each PDF:
 | Workflow | Trigger | Job |
 |---|---|---|
 | `MTR – 01 Trigger & Router` | Gmail trigger (Rod's Impressive Batteries' Email), label `Metering 2.0` | Deal ID from subject → fetch deal, validate, normalise, route |
-| `MTR – 10 EA Handler` | Execute Workflow (sub) | Fill EA form → DocuSeal → on signed, email EA |
+| `MTR – 10 EA Handler` | Execute Workflow (sub) | Fill EA form, Impressive signs as applicant, email EA (no DocuSeal) |
 | `MTR – 11 AGL Handler` | sub | Fill AGL PDF (+ consent) → DocuSeal → email |
 | `MTR – 12 GloBird Handler` | sub | Email network letter |
 | `MTR – 13 Amber Handler` | sub | Email docs |
@@ -349,17 +349,22 @@ roperties to fetch: every READ property in §3.2 plus the new ones.
 
 Form: `forms/ea.pdf` (EA "Service Works request for electricity", 2024 edition, supplied by Rodrigo). It is a **fillable AcroForm** with generic field names; `forms/ea-fieldmap.json` maps each one to its printed label and to a job-object path. `forms/ea-sample-filled.pdf` is a sample fill with dummy data.
 
+**Impressive is the applicant and signs** (decided). No DocuSeal for EA: the form is filled, signed with the signatory's signature image and today's date, and sent straight away.
+
 Data sources (decided):
-- **Account holder** = the deal's primary contact (always).
+- **Applicant (section 8)** = Impressive: signatory name/mobile `[CONFIRM]`, business name, ABN, email, landline from `config/contractors.json`.
+- **Electrician (section 6)** = nominated supervisor **Sam Husband**, licence **279684C**, Impressive business details. Section 7 (Level 2) left blank.
+- **Account holder** = the deal's primary contact. Their name goes at the start of the description of works (it is not asked for anywhere else on the form) and in the email body.
 - **System size** = `sf_system_size_kw_stc`.
-- **CCEW PDF** = file on a HubSpot note on the deal whose attachment name starts with `CCEW ` (e.g. `CCEW 1234567`); receipt number from the `ccew_receipt_number` property. If no note or the numbers differ → hold + alert.
-- **Contractor** = Impressive (above).
+- **Off peak** = `dedicated_controlled_load`: `Yes - Add` → Yes + "ADD DEDICATED CONTROLLED LOAD"; `Yes - Remove` → Yes + "REMOVE CONTROLLED LOAD"; `No` → No; blank → hold + task.
+- **CCEW PDF** = file on a HubSpot note on the deal whose attachment name starts with `CCEW ` (e.g. `CCEW 1234567`); receipt number from `ccew_receipt_number`. Missing, or numbers differ → hold + alert.
+- **Replies** from EA can go to any address; the form uses `ccew@impressivebatteries.com.au`.
 
 Steps:
-1. Fill per the fieldmap. Ticks: Solar alteration; Residential; off-peak change No; phase change No; Solar system New. Description of works (3 lines): `New {{kW}} kW solar PV installed {{install date}}. Please add solar channel / reconfigure or exchange meter as required. CCEW {{receipt}}. {{distributor}} approval {{reference}}.`
-2. If `property_ownership` is not Owner-occupier → task "Get landlord permission letter", hold, stop (EA requires the letter for leased premises).
-3. Send to DocuSeal (§7) for the account holder's signature; signature and date areas are in the fieldmap (`docuseal`). Status `Awaiting Customer Signature`.
-4. On completion (`MTR – 30`) email EA from Rod's Impressive Batteries' Email:
+1. Fill per `forms/ea-fieldmap.json`. Ticks: Solar alteration; Residential; off peak per above; phase change No; Solar system New.
+2. If `property_ownership` is not Owner-occupier → task "Get landlord permission letter", hold, stop (EA requires the owner's letter for leased premises).
+3. Stamp the signature image into `Signature79` and today's date into `Text78`. Upload the signed form to HubSpot Files (`metering/signed-forms/`) and note it on the deal.
+4. Email EA from Rod's Impressive Batteries' Email:
    - To: `solarconnections@energyaustralia.com.au`
    - Subject: `Solar meter alteration – NMI {{nmi}} – {{street}}, {{suburb}}`
    - Body: §8.1, signed **Impressive Team**
@@ -458,7 +463,7 @@ Solar installed: {{install.date}} (inverter switched on {{install.completionDate
 CCEW: {{ccew.receipt}}
 
 Attached:
-- Signed Service Works Request
+- Service Works Request (signed by Impressive as applicant)
 - CCEW
 - {{distributor}} network approval letter
 
@@ -508,7 +513,7 @@ Thanks,
 
 ## 11. Acceptance criteria (Phase 1 done when…)
 
-- [ ] A deal entering `1879662022` with EA as retailer and all data valid results in: DocuSeal request to the customer → after signing, one email to EA with 3 attachments → status, date, log, ticket and stage all updated. No human touch.
+- [ ] A deal entering `1879662022` with EA as retailer and all data valid results in: EA form filled and signed by Impressive → one email to EA with 3 attachments → status, date, log, ticket and stage all updated. No human touch.
 - [ ] Invalid data results in a hold status + a task listing every problem.
 - [ ] Running the poll twice never double-sends.
 - [ ] Dry run mode sends nothing externally.
