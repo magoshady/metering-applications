@@ -44,4 +44,4 @@ function formEndpoint({ required, fill, fileName }) {
   };
 }
 
-module.exports = { formEndpoint };
+module.exports = { formEndpoint, authorised };

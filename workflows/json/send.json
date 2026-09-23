@@ -39,13 +39,165 @@
     },
     {
       "parameters": {
-        "jsCode": "const i = $('When Called').first().json;\nconst now = $input.first().json.properties;\nif (now.metering_application_date && !i.settings.dryRun) throw new Error('deal ' + i.job.dealId + ': already has a Metering Application Date; not sending again');\nconst r = i.retailer;\nconst needsSignature = !!r.needsCustomerSignature && i.phase !== 'send';\nconst files = [];\nif (needsSignature) {\n  files.push({ kind: 'filler', form: r.consentForm, name: 'AGL consent form.pdf' });\n} else {\n  for (const a of r.attachments) {\n    if (a === 'ea_form' || a === 'agl_form') files.push({ kind: 'filler', form: r.form + '-form', name: a === 'ea_form' ? 'EA Service Works Request.pdf' : 'AGL Application for Electricity.pdf', upload: true });\n    else if (a === 'ccew') files.push({ kind: 'hubspot', fileId: i.job.ccew.fileId, name: 'CCEW ' + i.job.ccew.receipt + '.pdf' });\n    else if (a === 'network_letter') files.push({ kind: 'hubspot', fileId: i.job.networkApproval.fileId, name: i.job.distributor + ' network approval.pdf' });\n    else if (a === 'agl_consent_signed') files.push({ kind: 'url', url: i.signedConsentUrl, name: 'AGL consent form (signed).pdf', upload: true });\n  }\n}\nreturn files.map((f, n) => ({ json: { ...f, n, needsSignature, job: i.job, fillerUrl: i.settings.fillerUrl } }));"
+        "jsCode": "const i = $('When Called').first().json;\nconst now = $input.first().json.properties;\nif (now.metering_application_date && !i.settings.dryRun) throw new Error('deal ' + i.job.dealId + ': already has a Metering Application Date; not sending again');\nreturn [{ json: { ...i, needsSignature: !!i.retailer.needsCustomerSignature && i.phase !== 'send' } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         480,
         0
+      ],
+      "id": "ce5c11c0-eef9-432d-af1a-85a7fafc17fb",
+      "name": "Guard"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "sig",
+              "leftValue": "={{ $json.needsSignature }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "5086a275-4af4-4d68-a01e-240ffd29a8c7",
+      "name": "Needs Signature First?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.settings.fillerUrl }}/api/sign-link",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ...$json.job, signerEmail: $json.settings.dryRun ? $json.settings.testInbox : $json.job.accountHolder.email }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        -240
+      ],
+      "id": "4ca8c56a-1e68-410e-a983-46408bbcb2e1",
+      "name": "Get Signing Link (Vercel)",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4t99N3DNPPhFiej0",
+          "name": "EA Filler"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $('Guard').first().json;\nconst l = $input.first().json;\nconst s = i.settings;\nconst h = i.job.accountHolder;\nconst expires = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(l.expiresAt));\nconst to = s.dryRun ? s.testInbox : h.email;\nconst subject = (s.dryRun ? '[DRY RUN → ' + h.email + '] ' : '') + 'Please sign your AGL solar meter consent – ' + i.job.site.fullAddress;\nconst body = 'Hi ' + h.firstName + ',\\n\\n'\n  + 'To get your meter set up for your new solar at ' + i.job.site.fullAddress + ', AGL needs your consent for us to lodge the request on your behalf.\\n\\n'\n  + 'It takes about a minute. Please check your details and sign here:\\n' + l.url + '\\n\\n'\n  + 'The link is just for you and works until ' + expires + '.\\n\\n'\n  + 'If you have any questions, call us on 1300 797 630.\\n\\n'\n  + 'Kind regards,\\nImpressive Team\\nIMPRESSIVE ELECTRICAL & SOLAR PTY LTD | 1300 797 630';\nreturn [{ json: { ...i, invite: { to, subject, body, expiresAt: l.expiresAt } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -240
+      ],
+      "id": "c898985e-1b46-4a72-a7ed-8ed4480c3efb",
+      "name": "Compose Invite"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.invite.to }}",
+        "subject": "={{ $json.invite.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.invite.body }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Impressive Team"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        -240
+      ],
+      "id": "662d7e19-1d20-47f7-a29f-68df8ad1c502",
+      "name": "Email Homeowner",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bBoYFD6eHvB5ixtS",
+          "name": "Rod's Impressive Batteries' Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction appendLog(old, line) {\n  const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' }).format(new Date());\n  const lines = String(old || '').split('\\n').filter(Boolean);\n  lines.push(stamp + ' ' + line);\n  return lines.slice(-30).join('\\n');\n}\nconst i = $('Compose Invite').first().json;\nconst m = $input.first().json;\nconst line = (i.settings.dryRun ? '[DRY RUN] ' : '') + 'AGL consent link emailed to ' + i.invite.to + ' (expires ' + i.invite.expiresAt.slice(0, 10) + ') msgId=' + m.id;\nconst properties = { metering_automation_log: appendLog(i.deal.properties.metering_automation_log, line) };\nif (!i.settings.dryRun) Object.assign(properties, i.dealUpdates, { metering_status: 'Awaiting Customer Signature' });\nreturn [{ json: { dealId: i.job.dealId, properties } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        -240
+      ],
+      "id": "8332a097-c77a-47a9-a783-58f8e9a9c7f8",
+      "name": "Awaiting Signature Updates"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.hubapi.com/crm/v3/objects/deals/' + $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: $json.properties }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        -240
+      ],
+      "id": "b3cfb27d-7ca7-4280-a6fd-e0daed2519ed",
+      "name": "Update Deal (awaiting signature)",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "DK6aUhoyZ42IbfNM",
+          "name": "Impressive Batterie's Hubspot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $('Guard').first().json;\nconst r = i.retailer;\nconst files = [];\nfor (const a of r.attachments) {\n  if (a === 'ea_form' || a === 'agl_form') files.push({ kind: 'filler', form: r.form + '-form', name: a === 'ea_form' ? 'EA Service Works Request.pdf' : 'AGL Application for Electricity.pdf', upload: true });\n  else if (a === 'ccew') files.push({ kind: 'hubspot', fileId: i.job.ccew.fileId, name: 'CCEW ' + i.job.ccew.receipt + '.pdf' });\n  else if (a === 'network_letter') files.push({ kind: 'hubspot', fileId: i.job.networkApproval.fileId, name: i.job.distributor + ' network approval.pdf' });\n  else if (a === 'agl_consent_signed') {\n    if (!i.signedConsentPdf) throw new Error('deal ' + i.job.dealId + ': AGL needs the signed consent form but none was passed in');\n    files.push({ kind: 'inline', name: 'AGL consent form (signed).pdf', upload: true });\n  }\n}\nreturn files.map((f, n) => ({ json: { ...f, n, job: i.job, fillerUrl: i.settings.fillerUrl } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        120
       ],
       "id": "adf6dd5c-26ad-4487-a899-fdac4c791adb",
       "name": "Plan"
@@ -111,7 +263,7 @@
                 "conditions": [
                   {
                     "leftValue": "={{ $json.kind }}",
-                    "rightValue": "url",
+                    "rightValue": "inline",
                     "operator": {
                       "type": "string",
                       "operation": "equals"
@@ -121,7 +273,7 @@
                 "combinator": "and"
               },
               "renameOutput": true,
-              "outputKey": "url"
+              "outputKey": "inline"
             }
           ]
         },
@@ -130,8 +282,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        720,
-        0
+        1200,
+        120
       ],
       "id": "62a1e376-b57a-4279-a5c5-a423a435d7d6",
       "name": "By Source"
@@ -157,8 +309,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        960,
-        -160
+        1440,
+        -40
       ],
       "id": "198dff50-6d68-4207-adf4-383318800aec",
       "name": "Fill Form (Vercel)",
@@ -181,8 +333,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1200,
-        0
+        1440,
+        120
       ],
       "id": "b922fca0-83cf-4387-a2c8-05654f6f1ac7",
       "name": "HubSpot Signed URL",
@@ -209,8 +361,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1440,
-        0
+        1680,
+        120
       ],
       "id": "e3b8a7b8-53f5-482d-a584-edb36ed2b543",
       "name": "Download HubSpot File",
@@ -218,164 +370,55 @@
     },
     {
       "parameters": {
-        "url": "={{ $json.url }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file",
-              "outputPropertyName": "data"
-            }
-          }
-        }
+        "jsCode": "const i = $('Guard').first().json;\nreturn [{ json: {}, binary: { data: await this.helpers.prepareBinaryData(Buffer.from(i.signedConsentPdf, 'base64'), 'AGL consent form (signed).pdf', 'application/pdf') } }];"
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        1680,
-        160
+        1440,
+        280
       ],
-      "id": "f7e7e108-2a2c-49a7-a1a2-255c77aa94e9",
-      "name": "Download Signed Consent",
-      "onError": "continueErrorOutput"
+      "id": "c31d3d9f-e333-484c-a205-c6a82ae5653d",
+      "name": "Signed Consent File"
     },
     {
       "parameters": {
-        "jsCode": "const i = $('When Called').first().json;\nconst e = $input.first().json;\nthrow new Error('deal ' + i.job.dealId + ': could not get an attachment: ' + (e.error?.message || JSON.stringify(e.error || e).slice(0, 300)));"
+        "jsCode": "const i = $('Guard').first().json;\nconst e = $input.first().json;\nthrow new Error('deal ' + i.job.dealId + ': could not get an attachment: ' + (e.error?.message || JSON.stringify(e.error || e).slice(0, 300)));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         1920,
-        320
+        360
       ],
       "id": "4328ff52-a2da-4285-aebd-aebfe2866e0d",
       "name": "File Failed"
     },
     {
       "parameters": {
-        "jsCode": "const i = $('When Called').first().json;\nconst planned = $('Plan').all().map((p) => p.json);\nconst got = $input.all();\nif (got.length !== planned.length) throw new Error('deal ' + i.job.dealId + ': expected ' + planned.length + ' attachments, got ' + got.length);\nconst binary = {};\nconst files = [];\ngot.forEach((item, idx) => {\n  const p = $('Plan').itemMatching(idx).json;\n  if (!item.binary || !item.binary.data) throw new Error('deal ' + i.job.dealId + ': ' + p.name + ' came back empty');\n  const key = 'att' + p.n;\n  binary[key] = { ...item.binary.data, fileName: p.name, mimeType: 'application/pdf' };\n  files.push({ key, name: p.name, upload: !!p.upload });\n});\nfiles.sort((a, b) => a.key.localeCompare(b.key));\nreturn [{ json: { ...i, files, needsSignature: planned[0].needsSignature }, binary }];"
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1920,
+        120
+      ],
+      "id": "6c031f5a-8fae-4e34-ab4d-e8b1e8ee9f86",
+      "name": "Wait For All Files"
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $('Guard').first().json;\nconst planned = $('Plan').all().map((p) => p.json);\nconst got = $input.all();\nif (got.length !== planned.length) throw new Error('deal ' + i.job.dealId + ': expected ' + planned.length + ' attachments, got ' + got.length);\nconst binary = {};\nconst files = [];\ngot.forEach((item, idx) => {\n  const p = $('Plan').itemMatching(idx).json;\n  if (!item.binary || !item.binary.data) throw new Error('deal ' + i.job.dealId + ': ' + p.name + ' came back empty');\n  const key = 'att' + p.n;\n  binary[key] = { ...item.binary.data, fileName: p.name, mimeType: 'application/pdf' };\n  files.push({ key, name: p.name, upload: !!p.upload });\n});\nfiles.sort((a, b) => a.key.localeCompare(b.key));\nreturn [{ json: { ...i, files }, binary }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         2160,
-        0
+        120
       ],
       "id": "a5774bd4-ac7c-452a-a2ab-b32f967f6969",
       "name": "Collect Files"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "sig",
-              "leftValue": "={{ $json.needsSignature }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "looseTypeValidation": true,
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        2400,
-        0
-      ],
-      "id": "ad8fb753-1e9f-4f4d-ac1a-4cbe4eb56523",
-      "name": "Signature First?"
-    },
-    {
-      "parameters": {
-        "jsCode": "const i = $input.first().json;\nconst s = i.settings;\nconst map = {\"_source\":\"AGL 'Consent form – new connection request' AGL1295 (Updated June 2020), supplied by Rodrigo. Not fillable: boxes measured from the PDF's vector rectangles (PDF points, origin bottom-left, page index 0-based). The homeowner signs via DocuSeal; we fill everything else.\",\"text\":[{\"label\":\"1. Lot no\",\"page\":0,\"x\":60,\"y\":681,\"w\":15,\"h\":14,\"value\":\"site.lot\"},{\"label\":\"1. Unit no\",\"page\":0,\"x\":114,\"y\":681,\"w\":15,\"h\":14,\"value\":\"site.unit\"},{\"label\":\"1. Street no\",\"page\":0,\"x\":172,\"y\":681,\"w\":15,\"h\":14,\"value\":\"site.streetNumber\"},{\"label\":\"1. Street name\",\"page\":0,\"x\":241,\"y\":681,\"w\":321,\"h\":14,\"value\":\"site.streetLine\"},{\"label\":\"1. Suburb\",\"page\":0,\"x\":64,\"y\":656,\"w\":211,\"h\":14,\"value\":\"site.suburb\"},{\"label\":\"1. State\",\"page\":0,\"x\":311,\"y\":656,\"w\":107,\"h\":14,\"value\":\"site.state\"},{\"label\":\"1. Postcode\",\"page\":0,\"x\":466,\"y\":656,\"w\":96,\"h\":14,\"value\":\"site.postcode\"},{\"label\":\"2. Organiser first name\",\"page\":0,\"x\":74,\"y\":582,\"w\":117,\"h\":14,\"value\":\"applicant.firstName\"},{\"label\":\"2. Organiser surname\",\"page\":0,\"x\":235,\"y\":582,\"w\":117,\"h\":14,\"value\":\"applicant.lastName\"},{\"label\":\"2. Company name\",\"page\":0,\"x\":92,\"y\":562,\"w\":261,\"h\":14,\"value\":\"contractor.business\"},{\"label\":\"2. ABN\",\"page\":0,\"x\":382,\"y\":562,\"w\":180,\"h\":14,\"value\":\"contractor.abn\"},{\"label\":\"2. Phone\",\"page\":0,\"x\":82,\"y\":542,\"w\":121,\"h\":14,\"value\":\"applicant.mobile\"},{\"label\":\"2. Email\",\"page\":0,\"x\":235,\"y\":542,\"w\":327,\"h\":14,\"value\":\"contractor.email\",\"keepCase\":true},{\"label\":\"3. Homeowner first name\",\"page\":0,\"x\":74,\"y\":483,\"w\":137,\"h\":14,\"value\":\"accountHolder.firstName\"},{\"label\":\"3. Homeowner surname\",\"page\":0,\"x\":253,\"y\":483,\"w\":180,\"h\":14,\"value\":\"accountHolder.lastName\"},{\"label\":\"3. Current address\",\"page\":0,\"x\":92,\"y\":463,\"w\":471,\"h\":14,\"value\":\"site.fullStreet\"},{\"label\":\"3. Suburb\",\"page\":0,\"x\":64,\"y\":443,\"w\":158,\"h\":14,\"value\":\"site.suburb\"},{\"label\":\"3. State\",\"page\":0,\"x\":253,\"y\":443,\"w\":191,\"h\":14,\"value\":\"site.state\"},{\"label\":\"3. Postcode\",\"page\":0,\"x\":490,\"y\":443,\"w\":73,\"h\":14,\"value\":\"site.postcode\"},{\"label\":\"3. Mobile\",\"page\":0,\"x\":416,\"y\":423,\"w\":147,\"h\":14,\"value\":\"accountHolder.mobile\"},{\"label\":\"3. Email\",\"page\":0,\"x\":59,\"y\":403,\"w\":504,\"h\":14,\"value\":\"accountHolder.email\",\"keepCase\":true}],\"checkbox\":[{\"label\":\"1. Supply fuel type: Electricity\",\"page\":0,\"x\":92,\"y\":636,\"size\":14,\"value\":\"=true\"},{\"label\":\"3. Bills by email\",\"page\":0,\"x\":33,\"y\":368,\"size\":11,\"value\":\"=true\"},{\"label\":\"4. Model standing offer (NSW & SA)\",\"page\":1,\"x\":33,\"y\":318,\"size\":11,\"value\":\"=true\"}],\"leaveBlank\":[\"1. Gas\",\"2. Licence number (organiser is Rodrigo, not the electrician)\",\"3. Date of birth, home phone, work phone, paper bills\",\"4. Marketing opt-in ticks (the homeowner's choice)\"],\"docuseal\":{\"signature\":{\"page\":1,\"x\":112,\"y\":237,\"w\":282,\"h\":17,\"role\":\"Homeowner\"},\"date\":{\"page\":1,\"x\":447,\"y\":237,\"w\":73,\"h\":17,\"role\":\"Homeowner\"}}}.docuseal;\nconst W = 595.276, H = 841.89;\nconst area = (b) => ({ x: +(b.x / W).toFixed(4), y: +((H - b.y - b.h) / H).toFixed(4), w: +(b.w / W).toFixed(4), h: +(b.h / H).toFixed(4), page: b.page + 1 });\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'att0');\nconst email = s.dryRun ? s.testInbox : i.job.accountHolder.email;\nconst body = {\n  name: 'AGL consent – ' + i.job.accountHolder.fullName + ' – NMI ' + i.job.nmi,\n  send_email: true,\n  documents: [{ name: 'AGL consent form', file: buf.toString('base64'), fields: [\n    { name: 'Signature', type: 'signature', role: 'Homeowner', required: true, areas: [area(map.signature)] },\n    { name: 'Date', type: 'date', role: 'Homeowner', required: true, areas: [area(map.date)] },\n  ] }],\n  submitters: [{ role: 'Homeowner', email, name: i.job.accountHolder.fullName, external_id: String(i.job.dealId) }],\n  message: {\n    subject: (s.dryRun ? '[DRY RUN] ' : '') + 'Please sign your AGL solar meter consent – ' + i.job.site.fullAddress,\n    body: 'Hi ' + i.job.accountHolder.firstName + ',\\n\\nTo get your meter set up for solar, AGL needs your consent for us to lodge the request on your behalf. It takes a minute:\\n\\n{{submitter.link}}\\n\\nThanks,\\nImpressive Team',\n  },\n};\nreturn [{ json: { ...i, docusealBody: body } }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2640,
-        -200
-      ],
-      "id": "ff5629ed-9a5b-4a20-a973-5be04d944d36",
-      "name": "Build DocuSeal Request"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $json.settings.docusealApi }}/submissions/pdf",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.docusealBody) }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2880,
-        -200
-      ],
-      "id": "235c0be1-165e-47c5-abac-ec16bcfd764b",
-      "name": "Create DocuSeal Submission",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "3jRr6HHI4Wx4x1oP",
-          "name": "Docuseal"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "\nfunction appendLog(old, line) {\n  const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' }).format(new Date());\n  const lines = String(old || '').split('\\n').filter(Boolean);\n  lines.push(stamp + ' ' + line);\n  return lines.slice(-30).join('\\n');\n}\nconst i = $('Build DocuSeal Request').first().json;\nconst r = $input.first().json;\nconst subId = r.id || (Array.isArray(r) ? r[0]?.submission_id : '') || r.submission_id || '';\nconst line = (i.settings.dryRun ? '[DRY RUN] ' : '') + 'AGL consent sent to DocuSeal (submission ' + subId + ')';\nconst properties = { metering_automation_log: appendLog(i.deal.properties.metering_automation_log, line) };\nif (!i.settings.dryRun) Object.assign(properties, i.dealUpdates, { metering_status: 'Awaiting Customer Signature' });\nreturn [{ json: { dealId: i.job.dealId, properties } }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3120,
-        -200
-      ],
-      "id": "8332a097-c77a-47a9-a783-58f8e9a9c7f8",
-      "name": "Awaiting Signature Updates"
-    },
-    {
-      "parameters": {
-        "method": "PATCH",
-        "url": "={{ 'https://api.hubapi.com/crm/v3/objects/deals/' + $json.dealId }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "hubspotAppToken",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ properties: $json.properties }) }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        3360,
-        -200
-      ],
-      "id": "b3cfb27d-7ca7-4280-a6fd-e0daed2519ed",
-      "name": "Update Deal (awaiting signature)",
-      "credentials": {
-        "hubspotAppToken": {
-          "id": "DK6aUhoyZ42IbfNM",
-          "name": "Impressive Batterie's Hubspot"
-        }
-      }
     },
     {
       "parameters": {
@@ -384,8 +427,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2640,
-        160
+        2400,
+        120
       ],
       "id": "31d32e23-9566-43de-aa13-e3f003757542",
       "name": "Compose Email"
@@ -412,8 +455,8 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        2880,
-        160
+        2640,
+        120
       ],
       "id": "d7a3f08e-a374-46ce-ad6b-857b30ba5659",
       "name": "Send Email",
@@ -426,13 +469,13 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction appendLog(old, line) {\n  const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' }).format(new Date());\n  const lines = String(old || '').split('\\n').filter(Boolean);\n  lines.push(stamp + ' ' + line);\n  return lines.slice(-30).join('\\n');\n}\nconst i = $('Compose Email').first().json;\nconst m = $input.first().json;\nconst s = i.settings;\nconst today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());\nconst line = (s.dryRun ? '[DRY RUN] ' : '') + 'SENT ' + i.retailer.label + ' to ' + i.email.realTo + ' msgId=' + m.id + ' threadId=' + m.threadId;\nconst properties = { metering_automation_log: appendLog(i.deal.properties.metering_automation_log, line) };\nif (!s.dryRun) Object.assign(properties, i.dealUpdates, { metering_status: 'Metering Application Sent', metering_application_date: today, dealstage: s.stageAfterSend });\nconst uploads = s.dryRun ? [] : i.files.filter((f) => f.upload);\nreturn [{ json: { dealId: i.job.dealId, properties, uploads, noteBody: 'Metering application emailed to ' + i.retailer.label + ' (' + i.email.realTo + '): ' + i.email.subject } }];"
+        "jsCode": "\nfunction appendLog(old, line) {\n  const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' }).format(new Date());\n  const lines = String(old || '').split('\\n').filter(Boolean);\n  lines.push(stamp + ' ' + line);\n  return lines.slice(-30).join('\\n');\n}\nconst i = $('Compose Email').first().json;\nconst m = $input.first().json;\nconst s = i.settings;\nconst today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());\nlet line = (s.dryRun ? '[DRY RUN] ' : '') + 'SENT ' + i.retailer.label + ' to ' + i.email.realTo + ' msgId=' + m.id + ' threadId=' + m.threadId;\nif (i.consentAudit) line = (s.dryRun ? '[DRY RUN] ' : '') + 'Consent signed by ' + i.consentAudit.name + ' at ' + i.consentAudit.signedAt + ' IP ' + i.consentAudit.ip + '\\n' + line;\nconst properties = { metering_automation_log: appendLog(i.deal.properties.metering_automation_log, line) };\nif (!s.dryRun) Object.assign(properties, i.dealUpdates, { metering_status: 'Metering Application Sent', metering_application_date: today, dealstage: s.stageAfterSend });\nconst uploads = s.dryRun ? [] : i.files.filter((f) => f.upload);\nreturn [{ json: { dealId: i.job.dealId, properties, uploads, noteBody: 'Metering application emailed to ' + i.retailer.label + ' (' + i.email.realTo + '): ' + i.email.subject } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3120,
-        160
+        2880,
+        120
       ],
       "id": "048e8fb0-b496-4d24-aab5-d00d6fd29945",
       "name": "After Send"
@@ -451,8 +494,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3360,
-        160
+        3120,
+        120
       ],
       "id": "0ccb6452-583b-48e4-ae17-c504dab19acf",
       "name": "Update Deal (sent)",
@@ -470,8 +513,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3600,
-        160
+        3360,
+        120
       ],
       "id": "5161044e-3ee7-4c2d-a1f2-bb364a579468",
       "name": "Files To Upload"
@@ -510,8 +553,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3840,
-        160
+        3600,
+        120
       ],
       "id": "d3c6fbf6-66ab-4910-adf3-5edac9a921ff",
       "name": "Upload To HubSpot",
@@ -536,8 +579,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        4080,
-        160
+        3840,
+        120
       ],
       "id": "b7bc70d5-da59-47b4-adcf-ce18f9b3fff0",
       "name": "Note On Deal",
@@ -548,19 +591,6 @@
         }
       },
       "executeOnce": true
-    },
-    {
-      "parameters": {
-        "numberInputs": 3
-      },
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        1920,
-        0
-      ],
-      "id": "6c031f5a-8fae-4e34-ab4d-e8b1e8ee9f86",
-      "name": "Wait For All Files"
     }
   ],
   "connections": {
@@ -579,7 +609,80 @@
       "main": [
         [
           {
+            "node": "Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard": {
+      "main": [
+        [
+          {
+            "node": "Needs Signature First?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Signature First?": {
+      "main": [
+        [
+          {
+            "node": "Get Signing Link (Vercel)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Signing Link (Vercel)": {
+      "main": [
+        [
+          {
+            "node": "Compose Invite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Invite": {
+      "main": [
+        [
+          {
+            "node": "Email Homeowner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Homeowner": {
+      "main": [
+        [
+          {
+            "node": "Awaiting Signature Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Awaiting Signature Updates": {
+      "main": [
+        [
+          {
+            "node": "Update Deal (awaiting signature)",
             "type": "main",
             "index": 0
           }
@@ -615,7 +718,7 @@
         ],
         [
           {
-            "node": "Download Signed Consent",
+            "node": "Signed Consent File",
             "type": "main",
             "index": 0
           }
@@ -676,20 +779,13 @@
         ]
       ]
     },
-    "Download Signed Consent": {
+    "Signed Consent File": {
       "main": [
         [
           {
             "node": "Wait For All Files",
             "type": "main",
             "index": 2
-          }
-        ],
-        [
-          {
-            "node": "File Failed",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -709,58 +805,7 @@
       "main": [
         [
           {
-            "node": "Signature First?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Signature First?": {
-      "main": [
-        [
-          {
-            "node": "Build DocuSeal Request",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "Compose Email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build DocuSeal Request": {
-      "main": [
-        [
-          {
-            "node": "Create DocuSeal Submission",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Create DocuSeal Submission": {
-      "main": [
-        [
-          {
-            "node": "Awaiting Signature Updates",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Awaiting Signature Updates": {
-      "main": [
-        [
-          {
-            "node": "Update Deal (awaiting signature)",
             "type": "main",
             "index": 0
           }

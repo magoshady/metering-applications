@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign your AGL consent – Impressive</title>
+<style>
+  :root { --ink: #1b2230; --muted: #5d6675; --line: #d9dde3; --bg: #f5f6f8; --card: #fff; --brand: #0b5cad; --ok: #1e7b3a; --err: #b3261e; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 Arial, Helvetica, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  header { padding: 8px 0 16px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  #doc canvas { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 10px; background: #fff; }
+  label { display: block; font-weight: bold; margin: 12px 0 6px; }
+  input[type=text] { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+  .pad-wrap { position: relative; }
+  #pad { width: 100%; height: 180px; border: 2px dashed var(--line); border-radius: 8px; background: #fff; touch-action: none; display: block; }
+  .pad-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #aab1bb; pointer-events: none; }
+  .row { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; }
+  .row input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+  button { font: inherit; border-radius: 8px; padding: 12px 18px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  button.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: bold; width: 100%; margin-top: 16px; }
+  button:disabled { opacity: .6; cursor: default; }
+  .link { background: none; border: none; color: var(--brand); padding: 6px 0; text-decoration: underline; }
+  .msg { padding: 12px 14px; border-radius: 8px; margin-top: 12px; }
+  .msg.err { background: #fdecea; color: var(--err); }
+  .msg.ok { background: #e7f4ea; color: var(--ok); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Your AGL solar meter consent</h1>
+    <p class="muted">From Impressive Electrical &amp; Solar. It takes about a minute.</p>
+  </header>
+
+  <div id="loading" class="card">Loading your form…</div>
+  <div id="fatal" class="card hidden"><div class="msg err" id="fatalText"></div><p class="muted" style="margin-top:12px">Questions? Call us on 1300 797 630.</p></div>
+
+  <section id="form" class="hidden">
+    <div class="card">
+      <p>Hi <strong id="who"></strong>. To get your meter set up for your new solar at <strong id="addr"></strong>, AGL needs your consent for us to lodge the request on your behalf. Please check the form below, then sign at the bottom.</p>
+    </div>
+
+    <div class="card" id="doc"></div>
+
+    <div class="card">
+      <label for="name">Your full name</label>
+      <input id="name" type="text" autocomplete="name" placeholder="As on your electricity account">
+
+      <label for="pad">Your signature</label>
+      <div class="pad-wrap"><canvas id="pad"></canvas><div class="pad-hint" id="hint">Sign here with your finger or mouse</div></div>
+      <button class="link" id="clear" type="button">Clear signature</button>
+
+      <div class="row">
+        <input id="agree" type="checkbox">
+        <label for="agree" style="margin:0;font-weight:normal">I have read the consent form above, the details are correct, and I agree to sign it electronically.</label>
+      </div>
+
+      <button class="primary" id="submit" type="button">Sign and send</button>
+      <div id="err" class="msg err hidden"></div>
+    </div>
+  </section>
+
+  <div id="done" class="card hidden">
+    <div class="msg ok"><strong>Thank you, you're all done.</strong></div>
+    <p style="margin-top:12px">We'll send your consent to AGL with your meter request. There's nothing else you need to do. You can close this page.</p>
+  </div>
+</main>
+
+<script type="module">
+import * as pdfjs from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
+pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+
+const $ = (id) => document.getElementById(id);
+const token = new URLSearchParams(location.search).get('t') || '';
+const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
+
+function fatal(text) { show('loading', false); show('form', false); $('fatalText').textContent = text; show('fatal'); }
+
+async function load() {
+  if (!token) return fatal('This link is incomplete. Please use the link in your email.');
+  let r;
+  try { r = await fetch('/api/sign-preview?t=' + encodeURIComponent(token)); } catch { return fatal('We could not load your form. Please check your connection and try again.'); }
+  if (r.status === 410) return fatal('This link has expired. Please contact us and we will send you a new one.');
+  if (!r.ok) return fatal('This link is not valid. Please use the link in your email.');
+  const data = await r.json();
+  $('who').textContent = data.name;
+  $('addr').textContent = data.address;
+  $('name').value = data.name;
+  const bytes = Uint8Array.from(atob(data.pdf), (c) => c.charCodeAt(0));
+  const pdf = await pdfjs.getDocument({ data: bytes }).promise;
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const vp = page.getViewport({ scale: 2 });
+    const c = document.createElement('canvas');
+    c.width = vp.width; c.height = vp.height;
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    $('doc').appendChild(c);
+  }
+  show('loading', false); show('form');
+  setupPad();
+}
+
+let drawn = 0;
+function setupPad() {
+  const pad = $('pad');
+  const ctx = pad.getContext('2d');
+  const fit = () => {
+    const r = pad.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    pad.width = r.width * dpr; pad.height = r.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0d1a73';
+    drawn = 0; show('hint');
+  };
+  fit();
+  window.addEventListener('resize', () => { if (!drawn) fit(); });
+  let last = null;
+  const pos = (e) => { const r = pad.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  pad.addEventListener('pointerdown', (e) => { pad.setPointerCapture(e.pointerId); last = pos(e); show('hint', false); });
+  pad.addEventListener('pointermove', (e) => {
+    if (!last) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    drawn += Math.hypot(p.x - last.x, p.y - last.y); last = p;
+  });
+  const end = () => { last = null; };
+  pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end);
+  $('clear').onclick = () => { ctx.clearRect(0, 0, pad.width, pad.height); drawn = 0; show('hint'); };
+}
+
+// Crop the drawing to its ink so the signature fills the box on the form.
+function signaturePng() {
+  const pad = $('pad');
+  const ctx = pad.getContext('2d');
+  const { width, height } = pad;
+  const px = ctx.getImageData(0, 0, width, height).data;
+  let x0 = width, y0 = height, x1 = 0, y1 = 0;
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (px[(y * width + x) * 4 + 3] > 0) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  const m = 8;
+  x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(width, x1 + m); y1 = Math.min(height, y1 + m);
+  const out = document.createElement('canvas');
+  out.width = x1 - x0; out.height = y1 - y0;
+  out.getContext('2d').drawImage(pad, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  return out.toDataURL('image/png');
+}
+
+$('submit').onclick = async () => {
+  show('err', false);
+  const fail = (t) => { $('err').textContent = t; show('err'); };
+  if ($('name').value.trim().length < 2) return fail('Please type your full name.');
+  if (drawn < 40) return fail('Please draw your signature in the box.');
+  if (!$('agree').checked) return fail('Please tick the box to agree to sign electronically.');
+  $('submit').disabled = true; $('submit').textContent = 'Sending…';
+  try {
+    const r = await fetch('/api/sign-submit', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ t: token, signature: signaturePng(), typedName: $('name').value.trim(), agree: true }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'Something went wrong. Please try again.');
+    show('form', false); show('done');
+    window.scrollTo(0, 0);
+  } catch (e) {
+    fail(e.message);
+    $('submit').disabled = false; $('submit').textContent = 'Sign and send';
+  }
+};
+
+load().catch(() => fatal('We could not load your form. Please try again, or call us on 1300 797 630.'));
+</script>
+</body>
+</html>

@@ -37,7 +37,7 @@
     "phone": "1800 680 430",
     "enabled": true,
     "form": "agl",
-    "consentForm": "agl-consent"
+    "consentForm": "sign-page"
   },
   "globird": {
     "label": "GloBird",

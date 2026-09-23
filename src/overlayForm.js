@@ -68,13 +68,4 @@ function sydneyToday(today = new Date()) {
   return { day, month, year };
 }
 
-/**
- * DocuSeal field area for a box: fractions of the page, origin top-left.
- * @param {{page:number,x:number,y:number,w:number,h:number}} box
- */
-function docusealArea(box, pageWidth = 595.276, pageHeight = 841.89) {
-  const r = (n) => Math.round(n * 10000) / 10000;
-  return { page: box.page, x: r(box.x / pageWidth), y: r((pageHeight - box.y - box.h) / pageHeight), w: r(box.w / pageWidth), h: r(box.h / pageHeight) };
-}
-
-module.exports = { drawOverlay, drawSignature, renderTemplate, sydneyToday, docusealArea };
+module.exports = { drawOverlay, drawSignature, renderTemplate, sydneyToday };

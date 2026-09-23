@@ -31,9 +31,9 @@ HUBSPOT_TOKEN=... node scripts/phase0-backfill-retailer.js [--apply]
 `HUBSPOT_TOKEN` is a HubSpot private app token with `crm.objects.deals.read/write` and
 `crm.schemas.deals.read/write`. Never commit it.
 
-## Form filler (Vercel)
+## Form filler and signing page (Vercel)
 
-`api/ea-form.js` fills and signs the EnergyAustralia Service Works Request.
+`api/ea-form.js` and `api/agl-form.js` fill and sign the EA and AGL forms. `/sign` (public/sign) is the homeowner consent signing page for AGL: `api/sign-link` (n8n, x-api-key) makes an encrypted 14-day link, `api/sign-preview` shows the filled consent, `api/sign-submit` takes the drawn signature and forwards it to n8n (`MTR – 30`), and `api/sign-finalize` (x-api-key) returns the signed PDF with an audit line.
 
 Deploy once:
 1. In Vercel, **Add New → Project**, import `magoshady/metering-applications`. Framework preset **Other**, no build command, root directory `/`.

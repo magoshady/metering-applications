@@ -4,9 +4,9 @@
 // Neither PDF has form fields, so values are drawn at the box positions in
 // the fieldmaps (src/overlayForm.js). Impressive lodges as the authorised
 // contact person (application section 3b) and Rodrigo signs the application.
-// The consent form is signed by the homeowner through DocuSeal.
+// The consent form is signed by the homeowner on our signing page (/sign).
 
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const { drawOverlay, drawSignature, renderTemplate, sydneyToday } = require('./overlayForm');
 
 /**
@@ -24,12 +24,44 @@ async function fillAglForm(templateBytes, fieldmap, job, signatory) {
 }
 
 /**
- * Consent form, filled but unsigned: the homeowner signs in DocuSeal at
- * consentFieldmap.docuseal.
+ * Consent form, filled but unsigned (the signing page shows this).
  */
 async function fillAglConsent(templateBytes, consentFieldmap, job) {
   const doc = await PDFDocument.load(templateBytes);
   await drawOverlay(doc, consentFieldmap, job);
+  return doc.save();
+}
+
+/**
+ * Consent form signed by the homeowner: their drawn signature (PNG), the date
+ * and an audit line are stamped onto the filled form.
+ * @param {object} audit { name, email, signedAt (Date|ISO), ip, dealId }
+ */
+async function signAglConsent(templateBytes, consentFieldmap, job, signaturePng, audit) {
+  const doc = await PDFDocument.load(templateBytes);
+  await drawOverlay(doc, consentFieldmap, job);
+  const { signature: sb } = consentFieldmap.homeownerSignature;
+  const page = doc.getPages()[sb.page];
+  const png = await doc.embedPng(signaturePng);
+  const scale = Math.min((sb.w - 6) / png.width, (sb.h + 10) / png.height);
+  const w = png.width * scale;
+  const h = png.height * scale;
+  page.drawImage(png, { x: sb.x + 4, y: sb.y + (sb.h - h) / 2 + 2, width: w, height: h });
+
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const when = new Date(audit.signedAt);
+  const d = sydneyToday(when);
+  // The form prints "/ /" in the date box; write day, month and year between them.
+  const dp = consentFieldmap.homeownerSignature.dateParts;
+  for (const k of ['day', 'month', 'year']) page.drawText(d[k], { x: dp[k], y: dp.y + 5, size: 9, font, color: rgb(0, 0, 0) });
+  const t = consentFieldmap.homeownerSignature.acceptTick;
+  doc.getPages()[t.page].drawText('X', { x: t.x + 2, y: t.y + 2, size: t.size * 0.95, font: bold, color: rgb(0, 0, 0) });
+
+  const time = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit', hour12: false }).format(when);
+  const a = consentFieldmap.auditLine;
+  const line = `Signed electronically by ${audit.name} (${audit.email}) on ${d.day}/${d.month}/${d.year} ${time} AEST from IP ${audit.ip || 'unknown'}. Ref ${audit.dealId}.`;
+  doc.getPages()[a.page].drawText(line, { x: a.x, y: a.y, size: a.size, font, color: rgb(0.25, 0.25, 0.25) });
   return doc.save();
 }
 
@@ -75,4 +107,4 @@ function buildAglJob(job, fieldmap, contractor, today = new Date()) {
   return out;
 }
 
-module.exports = { fillAglForm, fillAglConsent, buildAglJob };
+module.exports = { fillAglForm, fillAglConsent, signAglConsent, buildAglJob };
